@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        parser: ["parsers/tree-sitter-minizinc"]
+        parser: ["eprime", "minizinc"]
 
     steps:
       - uses: actions/checkout@v3
@@ -18,16 +18,16 @@ jobs:
       - name: Install Dependencies
         run: npm ci
       - name: Build the parser
-        run: npm run parser:build --if-present
+        run: npm run parser:${{matrix.parser}}:build --if-present
       - name: Run parser tests
-        run: npm run parser:test
+        run: npm run parser:${{matrix.parser}}:test
       - name: Check if generated file are up-to-date
         run: git diff --exit-code
       - name: Upload artifact
         if: ${{ always() }}
         uses: actions/upload-artifact@v3
         with:
-          name: tree-sitter
+          name: tree-sitter-${{matrix.parser}}
           path: |
-            ${{matrix.parser}}/src
-            ${{matrix.parser}}/bindings/node
+            parsers/tree-sitter-${{matrix.parser}}/src
+            parsers/tree-sitter-${{matrix.parser}}/bindings/node
