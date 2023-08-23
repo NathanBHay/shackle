@@ -6,22 +6,23 @@
 
 use std::sync::Arc;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
 	constants::IdentifierRegistry,
 	thir::{
 		db::Thir,
+		pretty_print::PrettyPrinter,
 		source::Origin,
 		traverse::{
 			add_function, fold_call, fold_declaration_id, fold_domain, Folder, ReplacementMap,
 		},
 		ArrayComprehension, ArrayLiteral, Branch, Call, Callable, Declaration, DeclarationId,
 		Domain, DomainData, Expression, ExpressionBuilder, Function, FunctionId, Generator,
-		Identifier, IfThenElse, IntegerLiteral, Item, ItemId, LookupCall, Marker, Model, OptType,
-		RecordAccess, StringLiteral, TupleAccess,
+		Identifier, IfThenElse, IntegerLiteral, Item, ItemId, Marker, Model, OptType, RecordAccess,
+		StringLiteral, TupleAccess,
 	},
-	ty::{Ty, TyData, TyParamInstantiations},
+	ty::{FunctionType, Ty, TyData, TyParamInstantiations},
 	utils::DebugPrint,
 };
 
@@ -34,7 +35,7 @@ struct SpecialisedFunction<Dst> {
 struct TypeSpecialiser<Dst> {
 	specialised_model: Model<Dst>,
 	replacement_map: ReplacementMap<Dst>,
-	concrete: FxHashMap<(FunctionId, Vec<Ty>), FunctionId<Dst>>,
+	concrete: FxHashMap<(FunctionId, FunctionType), FunctionId<Dst>>,
 	specialised: Vec<(FunctionId<Dst>, SpecialisedFunction<Dst>)>,
 	todo: Vec<SpecialisedFunction<Dst>>,
 	ids: Arc<IdentifierRegistry>,
@@ -66,6 +67,10 @@ impl<Dst: Marker> Folder<'_, Dst> for TypeSpecialiser<Dst> {
 		// Add bodies to specialised functions
 		while let Some((f, s)) = self.specialised.pop() {
 			if let Some(b) = model[s.original].body() {
+				log::debug!(
+					"Adding specialised body to {}",
+					model[s.original].name().pretty_print(db)
+				);
 				self.todo.push(s);
 				let body = self.fold_expression(db, model, b);
 				self.todo.pop();
@@ -80,28 +85,15 @@ impl<Dst: Marker> Folder<'_, Dst> for TypeSpecialiser<Dst> {
 					if !ty.is_enum(db.upcast()) {
 						let body = self.generate_show(db, model, p, ty);
 						self.specialised_model[f].set_body(body);
+						log::debug!(
+							"Generated specialised show\n{}",
+							PrettyPrinter::new(db, &self.specialised_model)
+								.pretty_print_item(f.into())
+						);
 					}
 					continue;
 				}
 			}
-			// Call original builtin
-			let origin = self.specialised_model[f].origin();
-			let call = Call {
-				function: Callable::Function(
-					self.replacement_map
-						.get_function(s.original)
-						.unwrap_or_else(|| {
-							panic!("Did not add builtin {:?} to specialised model", s.original);
-						}),
-				),
-				arguments: self.specialised_model[f]
-					.parameters()
-					.iter()
-					.map(|p| self.expr(db, self.specialised_model[*p].origin(), *p))
-					.collect(),
-			};
-			let body = self.expr(db, origin, call);
-			self.specialised_model[f].set_body(body);
 		}
 
 		assert!(self.todo.is_empty());
@@ -141,16 +133,7 @@ impl<Dst: Marker> Folder<'_, Dst> for TypeSpecialiser<Dst> {
 				.iter()
 				.map(|arg| self.fold_expression(db, model, arg))
 				.collect::<Vec<_>>();
-			if model[*f].is_polymorphic() {
-				// eprintln!(
-				// 	"Instantiating call {}({})",
-				// 	model[*f].name().pretty_print(db),
-				// 	arguments
-				// 		.iter()
-				// 		.map(|e| e.ty().pretty_print(db.upcast()))
-				// 		.collect::<Vec<_>>()
-				// 		.join(", ")
-				// );
+			if self.needs_specialisation(db, model, *f, arguments.iter().map(|arg| arg.ty())) {
 				return Call {
 					function: Callable::Function(self.instantiate(
 						db,
@@ -161,15 +144,10 @@ impl<Dst: Marker> Folder<'_, Dst> for TypeSpecialiser<Dst> {
 					arguments,
 				};
 			}
-			if model[*f].top_level() {
-				// Re-match call since there may be a better version available
-				return LookupCall {
-					function: model[*f].name(),
-					arguments,
-				}
-				.resolve(db, &self.specialised_model)
-				.0;
-			}
+			return Call {
+				function: self.fold_callable(db, model, &call.function),
+				arguments,
+			};
 		}
 		fold_call(self, db, model, call)
 	}
@@ -190,6 +168,25 @@ impl<Dst: Marker> Folder<'_, Dst> for TypeSpecialiser<Dst> {
 }
 
 impl<Dst: Marker> TypeSpecialiser<Dst> {
+	fn needs_specialisation(
+		&self,
+		db: &dyn Thir,
+		model: &Model,
+		f: FunctionId,
+		args: impl IntoIterator<Item = Ty>,
+	) -> bool {
+		model[f].is_polymorphic()
+			&& (model[f].body().is_some()
+				|| (model[f].name() == self.ids.show
+					|| model[f].name() == self.ids.show_json
+					|| model[f].name() == self.ids.show_dzn)
+					&& args
+						.into_iter()
+						.next()
+						.unwrap()
+						.contains_erased_type(db.upcast()))
+	}
+
 	// Get or create the specialised version of a polymorphic function with the given argument types
 	fn instantiate(
 		&mut self,
@@ -201,24 +198,32 @@ impl<Dst: Marker> TypeSpecialiser<Dst> {
 		assert!(model[f].is_polymorphic());
 		assert!(model[f].top_level());
 
-		let ty_vars = model[f]
+		let (ty_vars, function_type) = model[f]
 			.function_entry(model)
 			.overload
 			.instantiate_ty_params(db.upcast(), args)
 			.unwrap();
 
-		let key = (
-			f,
-			model[f]
-				.type_inst_vars()
+		let key = (f, function_type);
+
+		log::debug!(
+			"Instantiating {} with {}",
+			PrettyPrinter::new(db, model).pretty_print_signature(f.into()),
+			ty_vars
 				.iter()
-				.map(|tv| ty_vars[&tv.ty_var])
-				.collect::<Vec<_>>(),
+				.map(|(tv, ty)| format!(
+					"{} = {}",
+					tv.pretty_print(db.upcast()),
+					ty.pretty_print(db.upcast())
+				))
+				.collect::<Vec<_>>()
+				.join(", ")
 		);
 
 		let concrete = self.concrete.get(&key);
 		if let Some(concrete) = concrete {
 			// Already instantiated this version
+			log::debug!("Already exists");
 			return *concrete;
 		}
 
@@ -240,6 +245,7 @@ impl<Dst: Marker> TypeSpecialiser<Dst> {
 			model[f].name(),
 			self.fold_domain(db, model, model[f].domain()),
 		);
+		function.set_specialised(true);
 		function.annotations_mut().extend(
 			model[f]
 				.annotations()
@@ -247,7 +253,7 @@ impl<Dst: Marker> TypeSpecialiser<Dst> {
 				.map(|ann| self.fold_expression(db, model, ann)),
 		);
 		function.set_parameters(model[f].parameters().iter().map(|p| {
-			self.add_declaration(db, model, *p);
+			self.add_parameter_declaration(db, model, *p);
 			self.fold_declaration_id(db, model, *p)
 		}));
 
@@ -258,15 +264,45 @@ impl<Dst: Marker> TypeSpecialiser<Dst> {
 			.copied()
 			.zip(function.parameters().iter().copied())
 			.collect();
-		let idx = if let Some(p) = self.position.get(&f) {
+		let position = || {
+			if function.name() == self.ids.show
+				|| function.name() == self.ids.show_json
+				|| function.name() == self.ids.show_dzn
+			{
+				// Show involving enums must appear after the definition of the enum
+				let needs_enums = self.specialised_model[function.parameter(0)]
+					.ty()
+					.walk(db.upcast())
+					.filter_map(|ty| ty.enum_ty(db.upcast()))
+					.collect::<FxHashSet<_>>();
+				if !needs_enums.is_empty() {
+					let enum_tys = self
+						.specialised_model
+						.enumerations()
+						.map(|(idx, e)| (idx, e.enum_type()))
+						.collect::<Vec<_>>();
+					for (idx, e) in enum_tys.into_iter().rev() {
+						if needs_enums.contains(&e) {
+							return Some(ItemId::from(idx));
+						}
+					}
+				}
+			}
+			self.position.get(&f).copied()
+		};
+		let idx = if let Some(p) = position() {
 			self.specialised_model
-				.add_function_after(Item::new(function, model[f].origin()), *p)
+				.add_function_after(Item::new(function, model[f].origin()), p)
 		} else {
 			self.specialised_model
 				.prepend_function(Item::new(function, model[f].origin()))
 		};
 		self.concrete.insert(key, idx);
 		self.specialised.push((idx, specialised));
+		log::debug!(
+			"Created {}",
+			PrettyPrinter::new(db, &self.specialised_model).pretty_print_signature(idx.into())
+		);
 		idx
 	}
 
@@ -296,7 +332,12 @@ impl<Dst: Marker> TypeSpecialiser<Dst> {
 					&args.iter().map(|arg| arg.ty()).collect::<Vec<_>>(),
 				)
 				.unwrap();
-			let idx = if lookup.fn_entry.overload.is_polymorphic() {
+			let idx = if ts.needs_specialisation(
+				db,
+				model,
+				lookup.function,
+				args.iter().map(|arg| arg.ty()),
+			) {
 				ts.instantiate(
 					db,
 					model,
@@ -588,25 +629,102 @@ mod test {
 			output [show(x)];
 			"#,
 			expect!([r#"
-    function bool: 'occurs<opt int>'(opt int: x) = occurs(x);
     function bool: occurs(opt $T: x);
-    function int: 'deopt<opt int>'(opt int: x) = deopt(x);
     function $T: deopt(opt $T: x);
-    function string: 'show<int>'(int: x) = show(x);
-    function string: 'show<bool>'(bool: x) = show(x);
-    function string: 'show<opt int>'(opt int: x) = if 'occurs<opt int>'(x) then 'show<int>'('deopt<opt int>'(x)) else "<>" endif;
-    function string: 'show<tuple(opt int, bool)>'(tuple(opt int, bool): x) = 'concat<array [int] of string>'(["(", 'show<opt int>'(x.1), ", ", 'show<bool>'(x.2), ")"]);
-    function string: 'show<record(int: a, int: b)>'(record(int: a, int: b): x) = 'concat<array [int] of string>'(["(", "a", ": ", 'show<int>'(x.a), ", ", "b", ": ", 'show<int>'(x.b), ")"]);
-    function string: show(any $T: x);
-    function string: 'show<array [int] of tuple(opt int, bool)>'(array [int] of tuple(opt int, bool): x) = 'concat<array [int] of string>'(["[", 'join<string, array [int] of string>'(", ", ['show<tuple(opt int, bool)>'(_DECL_11) | _DECL_11 in x]), "]"]);
-    function string: show(array [$X] of any $T: x);
-    function string: 'concat<array [int] of string>'(array [int] of string: x) = concat(x);
+    function string: 'show<opt int>'(opt int: x) = if occurs(x) then 'show<any $T>'(deopt(x)) else "<>" endif;
+    function string: 'show<tuple(opt int, bool)>'(tuple(opt int, bool): x) = concat(["(", 'show<opt int>'(x.1), ", ", 'show<any $T>'(x.2), ")"]);
+    function string: 'show<record(int: a, int: b)>'(record(int: a, int: b): x) = concat(["(", "a", ": ", 'show<any $T>'(x.a), ", ", "b", ": ", 'show<any $T>'(x.b), ")"]);
+    function string: 'show<any $T>'(any $T: x);
+    function string: 'show<array [int] of tuple(opt int, bool)>'(array [int] of tuple(opt int, bool): x) = concat(["[", join(", ", ['show<tuple(opt int, bool)>'(_DECL_11) | _DECL_11 in x]), "]"]);
+    function string: 'show<array [$X] of any $T>'(array [$X] of any $T: x);
     function string: concat(array [$T] of string: x);
-    function string: 'join<string, array [int] of string>'(string: s, array [int] of string: x) = join(s, x);
     function string: join(string: s, array [$T] of string: x);
     output ['show<record(int: a, int: b)>'((a: 1, b: 2))];
     array [int] of tuple(opt int, bool): x;
     output ['show<array [int] of tuple(opt int, bool)>'(x)];
+    solve satisfy;
+"#]),
+		)
+	}
+
+	#[test]
+	fn test_type_specialisation_equivalent() {
+		check_no_stdlib(
+			transformer(vec![type_specialise, mangle_names]),
+			r#"
+			test foo(var $T: v) = true;
+			var int: x;
+			int: y;
+			any: a = foo(x);
+			any: b = foo(y);
+			"#,
+			expect!([r#"
+    function bool: foo(var int: v) = true;
+    var int: x;
+    int: y;
+    bool: a = foo(x);
+    bool: b = foo(y);
+    solve satisfy;
+"#]),
+		)
+	}
+
+	#[test]
+	fn test_type_specialisation_enum_show() {
+		check_no_stdlib(
+			transformer(vec![type_specialise, mangle_names]),
+			r#"
+			function string: show(any $T: x);
+			function string: show(array [$X] of any $T: x);
+			function string: concat(array [$T] of string: x);
+			function string: join(string: s, array [$T] of string: x);
+			enum Foo;
+			Foo: x;
+			array [int] of Foo: y;
+			output [show(x)];
+			output [show(y)];
+			"#,
+			expect!([r#"
+    function string: 'show<any $T>'(any $T: x);
+    function string: 'show<array [$X] of any $T>'(array [$X] of any $T: x);
+    function string: concat(array [$T] of string: x);
+    function string: join(string: s, array [$T] of string: x);
+    enum Foo;
+    function string: 'show<array [int] of Foo>'(array [int] of Foo: x) = concat(["[", join(", ", ['show<Foo>'(_DECL_10) | _DECL_10 in x]), "]"]);
+    function string: 'show<Foo>'(Foo: x);
+    Foo: x;
+    array [int] of Foo: y;
+    output ['show<Foo>'(x)];
+    output ['show<array [int] of Foo>'(y)];
+    solve satisfy;
+"#]),
+		)
+	}
+
+	#[test]
+	fn test_type_specialisation_enum_show_2() {
+		check_no_stdlib(
+			transformer(vec![type_specialise, mangle_names]),
+			r#"
+			function string: show(any $T: x);
+			function string: show(array [$X] of any $T: x);
+			function string: concat(array [$T] of string: x);
+			function string: join(string: s, array [$T] of string: x);
+			function string: foo($$E: x) = show(x);
+			enum Foo;
+			Foo: x;
+			output [foo(x)];
+			"#,
+			expect!([r#"
+    function string: 'show<any $T>'(any $T: x);
+    function string: 'show<array [$X] of any $T>'(array [$X] of any $T: x);
+    function string: concat(array [$T] of string: x);
+    function string: join(string: s, array [$T] of string: x);
+    function string: foo(Foo: x) = 'show<Foo>'(x);
+    enum Foo;
+    function string: 'show<Foo>'(Foo: x);
+    Foo: x;
+    output [foo(x)];
     solve satisfy;
 "#]),
 		)

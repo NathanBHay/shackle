@@ -8,8 +8,8 @@ use std::{
 
 use super::{
 	domain::{OptType, VarType},
-	AnnotationId, Annotations, ConstraintId, DeclarationId, EnumerationId, FunctionId,
-	FunctionName, Identifier, Marker, Model,
+	AnnotationId, Annotations, ConstraintId, Declaration, DeclarationId, Domain, EnumerationId,
+	FunctionId, FunctionName, Identifier, Item, Marker, Model,
 };
 pub use crate::hir::{BooleanLiteral, FloatLiteral, IntegerLiteral, StringLiteral};
 use crate::{
@@ -835,7 +835,7 @@ impl<T: Marker> Call<T> {
 			Callable::Function(f) => {
 				let arg_tys = self.arguments.iter().map(|e| e.ty()).collect::<Vec<_>>();
 				let fe = model[*f].function_entry(model);
-				let ty_params = fe
+				let (_, ft) = fe
 					.overload
 					.instantiate_ty_params(db.upcast(), &arg_tys)
 					.unwrap_or_else(|e| {
@@ -846,7 +846,7 @@ impl<T: Marker> Call<T> {
 							e.debug_print(db.upcast())
 						);
 					});
-				fe.overload.instantiate(db.upcast(), &ty_params)
+				ft
 			}
 		}
 	}
@@ -910,6 +910,18 @@ impl<T: Marker> ExpressionBuilder<T> for LookupCall<T> {
 	}
 }
 
+/// A top-level identifier with the given name
+pub struct LookupIdentifier(pub Identifier);
+
+impl<T: Marker> ExpressionBuilder<T> for LookupIdentifier {
+	fn build(self, db: &dyn Thir, model: &Model<T>, origin: Origin) -> Expression<T> {
+		model
+			.lookup_identifier(db, self.0)
+			.unwrap_or_else(|| panic!("Undefined variable '{}'", self.0.pretty_print(db.upcast())))
+			.build(db, model, origin)
+	}
+}
+
 /// A let expression
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Let<T = ()> {
@@ -920,7 +932,16 @@ pub struct Let<T = ()> {
 }
 
 impl<T: Marker> ExpressionBuilder<T> for Let<T> {
-	fn build(self, _db: &dyn Thir, _model: &Model<T>, origin: Origin) -> Expression<T> {
+	fn build(self, db: &dyn Thir, model: &Model<T>, origin: Origin) -> Expression<T> {
+		let types = db.type_registry();
+		if self.in_expression.ty() == types.par_bool
+			&& self.items.iter().any(|item| match item {
+				LetItem::Constraint(idx) => model[*idx].expression().ty() == types.var_bool,
+				LetItem::Declaration(idx) => !model[*idx].ty().known_par(db.upcast()),
+			}) {
+			// Becomes var because any var partiality bubbles up to this point
+			return Expression::new_unchecked(types.var_bool, self, origin);
+		}
 		Expression::new_unchecked(self.in_expression.ty(), self, origin)
 	}
 }
@@ -1183,6 +1204,28 @@ pub enum Generator<T = ()> {
 }
 
 impl<T: Marker> Generator<T> {
+	/// Create a generator that iterates over the given collection
+	pub fn iterator(
+		db: &dyn Thir,
+		count: usize,
+		collection: Expression<T>,
+		model: &mut Model<T>,
+	) -> Self {
+		let mut declarations = Vec::with_capacity(count);
+		let elem = collection.ty().elem_ty(db.upcast()).unwrap();
+		for _ in 0..count {
+			declarations.push(model.add_declaration(Item::new(
+				Declaration::new(false, Domain::unbounded(db, collection.origin(), elem)),
+				collection.origin(),
+			)));
+		}
+		Self::Iterator {
+			declarations,
+			collection,
+			where_clause: None,
+		}
+	}
+
 	/// Whether this generator has a var where clause
 	pub fn var_where(&self, db: &dyn Thir) -> bool {
 		match self {

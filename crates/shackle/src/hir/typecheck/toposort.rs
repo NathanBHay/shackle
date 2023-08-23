@@ -18,6 +18,7 @@ use crate::{
 		Expression, Goal, Pattern, Type,
 	},
 	ty::FunctionEntry,
+	utils::DebugPrint,
 	Error,
 };
 
@@ -27,10 +28,8 @@ use super::PatternTy;
 pub fn topological_sort(db: &dyn Hir) -> (Arc<Vec<ItemRef>>, Arc<Vec<Error>>) {
 	let mut topo_sorter = TopoSorter::new(db);
 	for m in db.resolve_includes().unwrap().iter() {
-		let model = db.lookup_model(*m);
-		for it in model.items.iter() {
-			let item = ItemRef::new(db, *m, *it);
-			topo_sorter.run(item);
+		for item in db.lookup_items(*m).iter() {
+			topo_sorter.run(*item);
 		}
 	}
 	let (sorted, diagnostics) = topo_sorter.finish();
@@ -173,7 +172,7 @@ impl<'a> TopoSorter<'a> {
 							overloads,
 							f.overload.params(),
 						)
-						.unwrap();
+						.unwrap_or_else(|e| panic!("{}", e.debug_print(self.db.upcast())));
 						if !is_self {
 							// Ignore this function since it has been subsumed by another
 							return;
