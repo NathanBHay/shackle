@@ -4,7 +4,7 @@
 //! - Replace `opt T` with `tuple(bool, T)`
 //! - Make `occurs(x)` return `x.1` and `deopt(x)` return `x.2`
 //!
-//! Does not handle records, so records must be erased into tuple first
+//! Does not handle records, so records must be erased into tuples first
 
 use std::sync::Arc;
 
@@ -15,9 +15,13 @@ use crate::{
 	hir::{BooleanLiteral, IntegerLiteral, OptType, VarType},
 	thir::{
 		db::Thir,
-		traverse::{fold_domain, Folder, ReplacementMap},
-		ArrayComprehension, Call, Declaration, Domain, DummyValue, Expression, ExpressionData,
-		Generator, Item, Let, LetItem, LookupCall, Marker, Model, TupleAccess, TupleLiteral,
+		source::Origin,
+		traverse::{
+			add_function, fold_domain, fold_expression, fold_function_body, Folder, ReplacementMap,
+		},
+		ArrayComprehension, Call, Callable, Constraint, Declaration, Domain, DomainData,
+		DummyValue, Expression, ExpressionData, FunctionId, Generator, Item, Let, LetItem,
+		LookupCall, Marker, Model, TupleAccess, TupleLiteral,
 	},
 	ty::{Ty, TyData},
 };
@@ -39,62 +43,31 @@ impl<Dst: Marker, Src: Marker> Folder<'_, Dst, Src> for OptEraser<Dst, Src> {
 		&mut self.replacement_map
 	}
 
-	fn add_model(&mut self, db: &dyn Thir, model: &Model<Src>) {
-		// Add items to the destination model
-		for item in model.top_level_items() {
-			self.add_item(db, model, item);
+	fn add_function(&mut self, db: &dyn Thir, model: &Model<Src>, f: FunctionId<Src>) {
+		if model[f].name() == self.ids.mzn_construct_opt
+			|| model[f].name() == self.ids.mzn_destruct_opt
+		{
+			// Remove mzn_construct_opt/mzn_destruct_opt
+			return;
 		}
-		// Now that all items have been added, we can process function bodies
-		for (f, i) in model.all_functions() {
-			if i.body().is_some() {
-				self.fold_function_body(db, model, f);
-			} else if i.name() == self.ids.occurs {
-				// Add body to occurs which accesses boolean from tuple
-				let idx = self.replacement_map.get_function(f).unwrap();
-				let origin = self.model[idx].origin();
-				let body = Expression::new(
-					db,
-					&self.model,
-					origin,
-					TupleAccess {
-						tuple: Box::new(Expression::new(
-							db,
-							&self.model,
-							origin,
-							self.model[idx].parameter(0),
-						)),
-						field: IntegerLiteral(1),
-					},
-				);
-				self.model[idx].set_body(body);
-			} else if i.name() == self.ids.deopt {
-				// Add body to deopt which accesses value from tuple
-				let idx = self.replacement_map.get_function(f).unwrap();
-				let origin = self.model[idx].origin();
-				let body = Expression::new(
-					db,
-					&self.model,
-					origin,
-					TupleAccess {
-						tuple: Box::new(Expression::new(
-							db,
-							&self.model,
-							origin,
-							self.model[idx].parameter(0),
-						)),
-						field: IntegerLiteral(2),
-					},
-				);
-				self.model[idx].set_body(body);
-			}
+		add_function(self, db, model, f);
+	}
+
+	fn fold_function_body(&mut self, db: &dyn Thir, model: &Model<Src>, f: FunctionId<Src>) {
+		if model[f].name() == self.ids.mzn_construct_opt
+			|| model[f].name() == self.ids.mzn_destruct_opt
+		{
+			// Remove mzn_construct_opt/mzn_destruct_opt
+			return;
 		}
+		fold_function_body(self, db, model, f)
 	}
 
 	fn fold_declaration(
 		&mut self,
-		db: &'_ dyn Thir,
-		model: &'_ Model<Src>,
-		d: &'_ Declaration<Src>,
+		db: &dyn Thir,
+		model: &Model<Src>,
+		d: &Declaration<Src>,
 	) -> Declaration<Dst> {
 		let mut declaration =
 			Declaration::new(d.top_level(), self.fold_domain(db, model, d.domain()));
@@ -111,6 +84,29 @@ impl<Dst: Marker, Src: Marker> Folder<'_, Dst, Src> for OptEraser<Dst, Src> {
 			let erased = self.erase_opt(db, d.ty(), def.ty(), folded);
 			declaration.set_definition(erased);
 			declaration.validate(db);
+		} else if let DomainData::Bounded(e) = &**d.domain() {
+			if d.ty().inst(db.upcast()) == Some(VarType::Var)
+				&& d.ty().opt(db.upcast()) == Some(OptType::Opt)
+			{
+				// Cannot leave domain in tuple type-inst
+				let dom = self.fold_expression(db, model, e);
+				let dom_decl = Declaration::from_expression(db, false, dom);
+				let dom_idx = self.model.add_declaration(Item::new(dom_decl, e.origin()));
+				let opt_var = self.create_opt_var(
+					db,
+					e.origin(),
+					Expression::new(db, &self.model, e.origin(), dom_idx),
+				);
+				declaration.set_definition(Expression::new(
+					db,
+					&self.model,
+					e.origin(),
+					Let {
+						items: vec![LetItem::Declaration(dom_idx)],
+						in_expression: Box::new(opt_var),
+					},
+				));
+			}
 		}
 		declaration
 	}
@@ -129,14 +125,15 @@ impl<Dst: Marker, Src: Marker> Folder<'_, Dst, Src> for OptEraser<Dst, Src> {
 			} else {
 				self.tys.par_bool
 			};
-			let mut folded = fold_domain(self, db, model, domain);
-			let deopt = folded.ty().make_occurs(db.upcast());
-			folded.set_ty_unchecked(deopt);
+			let deopt = domain.ty().make_occurs(db.upcast());
 			return Domain::tuple(
 				db,
 				origin,
 				OptType::NonOpt,
-				[Domain::unbounded(db, origin, occurs), folded],
+				[
+					Domain::unbounded(db, origin, occurs),
+					Domain::unbounded(db, origin, deopt),
+				],
 			);
 		}
 		fold_domain(self, db, model, domain)
@@ -157,6 +154,25 @@ impl<Dst: Marker, Src: Marker> Folder<'_, Dst, Src> for OptEraser<Dst, Src> {
 				.collect(),
 		};
 		call
+	}
+
+	fn fold_expression(
+		&mut self,
+		db: &dyn Thir,
+		model: &Model<Src>,
+		expression: &Expression<Src>,
+	) -> Expression<Dst> {
+		if let ExpressionData::Call(c) = &**expression {
+			// Remove calls to mzn_construct_opt/mzn_destruct_opt
+			if let Callable::Function(f) = &c.function {
+				if model[*f].name() == self.ids.mzn_construct_opt
+					|| model[*f].name() == self.ids.mzn_destruct_opt
+				{
+					return self.fold_expression(db, model, &c.arguments[0]);
+				}
+			}
+		}
+		fold_expression(self, db, model, expression)
 	}
 }
 
@@ -320,6 +336,87 @@ impl<Src: Marker, Dst: Marker> OptEraser<Dst, Src> {
 		// No need to do anything
 		e
 	}
+
+	fn create_opt_var(
+		&mut self,
+		db: &dyn Thir,
+		origin: Origin,
+		domain: Expression<Dst>,
+	) -> Expression<Dst> {
+		let occurs_decl = Declaration::new(false, Domain::unbounded(db, origin, self.tys.var_bool));
+		let deopt_decl = Declaration::new(
+			false,
+			Domain::bounded(
+				db,
+				origin,
+				VarType::Var,
+				OptType::NonOpt,
+				Expression::new(
+					db,
+					&self.model,
+					origin,
+					LookupCall {
+						function: self.ids.mzn_opt_domain.into(),
+						arguments: vec![domain.clone()],
+					},
+				),
+			),
+		);
+		let tuple_ty = Ty::tuple(db.upcast(), [occurs_decl.ty(), deopt_decl.ty()]);
+		let occurs = self.model.add_declaration(Item::new(occurs_decl, origin));
+		let deopt = self.model.add_declaration(Item::new(deopt_decl, origin));
+
+		Expression::new(
+			db,
+			&self.model,
+			origin,
+			TupleLiteral(vec![
+				Expression::new(db, &self.model, origin, occurs),
+				Expression::new(db, &self.model, origin, deopt),
+			]),
+		);
+
+		let mut tuple_decl = Declaration::new(false, Domain::unbounded(db, origin, tuple_ty));
+		tuple_decl.set_definition(Expression::new(
+			db,
+			&self.model,
+			origin,
+			TupleLiteral(vec![
+				Expression::new(db, &self.model, origin, occurs),
+				Expression::new(db, &self.model, origin, deopt),
+			]),
+		));
+		let tuple = self.model.add_declaration(Item::new(tuple_decl, origin));
+
+		let channel = Constraint::new(
+			false,
+			Expression::new(
+				db,
+				&self.model,
+				origin,
+				LookupCall {
+					function: self.ids.mzn_opt_channel.into(),
+					arguments: vec![Expression::new(db, &self.model, origin, tuple), domain],
+				},
+			),
+		);
+
+		let constraint = self.model.add_constraint(Item::new(channel, origin));
+		Expression::new(
+			db,
+			&self.model,
+			origin,
+			Let {
+				items: vec![
+					LetItem::Declaration(occurs),
+					LetItem::Declaration(deopt),
+					LetItem::Declaration(tuple),
+					LetItem::Constraint(constraint),
+				],
+				in_expression: Box::new(Expression::new(db, &self.model, origin, tuple)),
+			},
+		)
+	}
 }
 
 /// Erase types which are not present in MicroZinc
@@ -348,6 +445,8 @@ mod test {
 		check_no_stdlib(
 			transformer(vec![top_down_type, erase_opt]),
 			r#"
+				function set of int: mzn_opt_domain(set of int: x);
+				predicate mzn_opt_channel(var opt int: x, set of int: s);
                 opt int: x = 2;
 				opt bool: y = <>;
 				var opt {1, 2, 3}: a;
@@ -359,27 +458,36 @@ mod test {
 				any: f = foo(1);
             "#,
 			expect!([r#"
+    function set of int: mzn_opt_domain(set of int: x);
+    function var bool: mzn_opt_channel(tuple(var bool, var int): x, set of int: s);
     tuple(bool, int): x = (true, 2);
     tuple(bool, bool): y = (false, false);
-    tuple(var bool, var {1, 2, 3}): a;
+    tuple(var bool, var int): a = let {
+      set of int: _DECL_6 = {1, 2, 3};
+    } in let {
+      var bool: _DECL_7;
+      var mzn_opt_domain(_DECL_6): _DECL_8;
+      tuple(var bool, var int): _DECL_9 = (_DECL_7, _DECL_8);
+      constraint mzn_opt_channel(_DECL_9, _DECL_6);
+    } in _DECL_9;
     tuple(bool, int): b = if true then let {
-      tuple(bool, int): _DECL_4 = (true, 1);
-    } in _DECL_4 else let {
-      tuple(bool, int): _DECL_5 = (false, 0);
-    } in _DECL_5 endif;
+      tuple(bool, int): _DECL_11 = (true, 1);
+    } in _DECL_11 else let {
+      tuple(bool, int): _DECL_12 = (false, 0);
+    } in _DECL_12 endif;
     array [int] of tuple(bool, int): c = [let {
-      tuple(bool, int): _DECL_7 = (true, 1);
-    } in _DECL_7, let {
-      tuple(bool, int): _DECL_8 = (false, 0);
-    } in _DECL_8];
+      tuple(bool, int): _DECL_14 = (true, 1);
+    } in _DECL_14, let {
+      tuple(bool, int): _DECL_15 = (false, 0);
+    } in _DECL_15];
     tuple(int, tuple(bool, int)): d;
     tuple(tuple(bool, int), tuple(bool, int)): e = ((true, d.1), d.2);
     function tuple(bool, int): foo(tuple(bool, int): x) = let {
-      tuple(bool, int): _DECL_15 = (true, 1);
-    } in _DECL_15;
+      tuple(bool, int): _DECL_22 = (true, 1);
+    } in _DECL_22;
     tuple(bool, int): f = foo(let {
-      tuple(bool, int): _DECL_13 = (true, 1);
-    } in _DECL_13);
+      tuple(bool, int): _DECL_20 = (true, 1);
+    } in _DECL_20);
     solve satisfy;
 "#]),
 		);
