@@ -1,7 +1,9 @@
 //! AST representation of items
 
-use super::{
-	helpers::*, Anonymous, AstNode, Children, Expression, Identifier, Pattern, StringLiteral, Type,
+use super::{Anonymous, Children, Expression, Identifier, Pattern, StringLiteral, Type};
+use crate::syntax::ast::{
+	ast_enum, ast_node, child_with_field_name, children_with_field_name,
+	optional_child_with_field_name, AstNode,
 };
 
 ast_enum!(
@@ -459,7 +461,7 @@ impl TypeAlias {
 
 #[cfg(test)]
 mod test {
-	use crate::syntax::ast::helpers::test::*;
+	use crate::syntax::ast::test::*;
 	use expect_test::expect;
 
 	#[test]

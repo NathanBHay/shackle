@@ -1,8 +1,11 @@
 //! AST representation of destructuring patterns
 
 use super::{
-	helpers::*, Absent, Anonymous, AstNode, BooleanLiteral, Children, FloatLiteral, Identifier,
-	Infinity, IntegerLiteral, StringLiteral,
+	Absent, Anonymous, BooleanLiteral, Children, FloatLiteral, Identifier, Infinity,
+	IntegerLiteral, StringLiteral,
+};
+use crate::syntax::ast::{
+	ast_enum, ast_node, child_with_field_name, children_with_field_name, AstNode,
 };
 
 ast_enum!(
@@ -117,7 +120,7 @@ impl PatternRecordField {
 
 #[cfg(test)]
 mod test {
-	use crate::syntax::ast::helpers::test::*;
+	use crate::syntax::ast::test::*;
 	use expect_test::expect;
 
 	#[test]

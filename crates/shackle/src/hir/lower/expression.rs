@@ -6,7 +6,7 @@ use crate::{
 	db::InternedStringData,
 	diagnostics::{InvalidArrayLiteral, SyntaxError},
 	hir::source::Origin,
-	syntax::ast::{self, AstNode},
+	syntax::{ast::AstNode, minizinc},
 	Error,
 };
 
@@ -43,19 +43,22 @@ impl ExpressionCollector<'_> {
 	}
 
 	/// Lower an AST expression into HIR
-	pub fn collect_expression(&mut self, expression: ast::Expression) -> ArenaIndex<Expression> {
+	pub fn collect_expression(
+		&mut self,
+		expression: minizinc::Expression,
+	) -> ArenaIndex<Expression> {
 		let origin = Origin::new(&expression);
 		if expression.is_missing() {
 			return self.alloc_expression(origin, Expression::Missing);
 		}
 		let collected: Expression = match expression {
-			ast::Expression::IntegerLiteral(i) => IntegerLiteral(i.value()).into(),
-			ast::Expression::FloatLiteral(f) => FloatLiteral::new(f.value()).into(),
-			ast::Expression::BooleanLiteral(b) => BooleanLiteral(b.value()).into(),
-			ast::Expression::StringLiteral(s) => StringLiteral::new(s.value(), self.db).into(),
-			ast::Expression::Absent(_) => Expression::Absent,
-			ast::Expression::Infinity(_) => Expression::Infinity,
-			ast::Expression::Anonymous(a) => {
+			minizinc::Expression::IntegerLiteral(i) => IntegerLiteral(i.value()).into(),
+			minizinc::Expression::FloatLiteral(f) => FloatLiteral::new(f.value()).into(),
+			minizinc::Expression::BooleanLiteral(b) => BooleanLiteral(b.value()).into(),
+			minizinc::Expression::StringLiteral(s) => StringLiteral::new(s.value(), self.db).into(),
+			minizinc::Expression::Absent(_) => Expression::Absent,
+			minizinc::Expression::Infinity(_) => Expression::Infinity,
+			minizinc::Expression::Anonymous(a) => {
 				// No longer support anonymous variables, instead use opt
 				let (src, span) = a.cst_node().source_span(self.db.upcast());
 				self.add_diagnostic(SyntaxError {
@@ -66,34 +69,40 @@ impl ExpressionCollector<'_> {
 				});
 				Expression::Missing
 			}
-			ast::Expression::Identifier(i) => Identifier::new(i.name(), self.db).into(),
-			ast::Expression::TupleLiteral(t) => self.collect_tuple_literal(t).into(),
-			ast::Expression::RecordLiteral(r) => self.collect_record_literal(r).into(),
-			ast::Expression::SetLiteral(sl) => self.collect_set_literal(sl).into(),
-			ast::Expression::ArrayLiteral(al) => return self.collect_array_literal(al),
-			ast::Expression::ArrayLiteral2D(al) => return self.collect_2d_array_literal(al),
-			ast::Expression::ArrayAccess(aa) => self.collect_array_access(aa).into(),
-			ast::Expression::ArrayComprehension(c) => self.collect_array_comprehension(c).into(),
-			ast::Expression::SetComprehension(c) => self.collect_set_comprehension(c).into(),
-			ast::Expression::IfThenElse(i) => self.collect_if_then_else(i).into(),
-			ast::Expression::Call(c) => self.collect_call(c).into(),
-			ast::Expression::InfixOperator(o) => return self.collect_infix_operator(o),
-			ast::Expression::PrefixOperator(o) => return self.collect_prefix_operator(o),
-			ast::Expression::PostfixOperator(o) => return self.collect_postfix_operator(o),
-			ast::Expression::GeneratorCall(c) => return self.collect_generator_call(c),
-			ast::Expression::StringInterpolation(s) => return self.collect_string_interpolation(s),
-			ast::Expression::Case(c) => self.collect_case(c).into(),
-			ast::Expression::Let(l) => self.collect_let(l).into(),
-			ast::Expression::TupleAccess(t) => self.collect_tuple_access(t).into(),
-			ast::Expression::RecordAccess(t) => self.collect_record_access(t).into(),
-			ast::Expression::Lambda(l) => self.collect_lambda(l).into(),
-			ast::Expression::AnnotatedExpression(e) => return self.collect_annotated_expression(e),
+			minizinc::Expression::Identifier(i) => Identifier::new(i.name(), self.db).into(),
+			minizinc::Expression::TupleLiteral(t) => self.collect_tuple_literal(t).into(),
+			minizinc::Expression::RecordLiteral(r) => self.collect_record_literal(r).into(),
+			minizinc::Expression::SetLiteral(sl) => self.collect_set_literal(sl).into(),
+			minizinc::Expression::ArrayLiteral(al) => return self.collect_array_literal(al),
+			minizinc::Expression::ArrayLiteral2D(al) => return self.collect_2d_array_literal(al),
+			minizinc::Expression::ArrayAccess(aa) => self.collect_array_access(aa).into(),
+			minizinc::Expression::ArrayComprehension(c) => {
+				self.collect_array_comprehension(c).into()
+			}
+			minizinc::Expression::SetComprehension(c) => self.collect_set_comprehension(c).into(),
+			minizinc::Expression::IfThenElse(i) => self.collect_if_then_else(i).into(),
+			minizinc::Expression::Call(c) => self.collect_call(c).into(),
+			minizinc::Expression::InfixOperator(o) => return self.collect_infix_operator(o),
+			minizinc::Expression::PrefixOperator(o) => return self.collect_prefix_operator(o),
+			minizinc::Expression::PostfixOperator(o) => return self.collect_postfix_operator(o),
+			minizinc::Expression::GeneratorCall(c) => return self.collect_generator_call(c),
+			minizinc::Expression::StringInterpolation(s) => {
+				return self.collect_string_interpolation(s)
+			}
+			minizinc::Expression::Case(c) => self.collect_case(c).into(),
+			minizinc::Expression::Let(l) => self.collect_let(l).into(),
+			minizinc::Expression::TupleAccess(t) => self.collect_tuple_access(t).into(),
+			minizinc::Expression::RecordAccess(t) => self.collect_record_access(t).into(),
+			minizinc::Expression::Lambda(l) => self.collect_lambda(l).into(),
+			minizinc::Expression::AnnotatedExpression(e) => {
+				return self.collect_annotated_expression(e)
+			}
 		};
 		self.alloc_expression(origin, collected)
 	}
 
 	/// Lower an AST type into HIR
-	pub fn collect_type(&mut self, t: ast::Type) -> ArenaIndex<Type> {
+	pub fn collect_type(&mut self, t: minizinc::Type) -> ArenaIndex<Type> {
 		let mut tiids = TypeInstIdentifiers::default();
 		self.collect_type_with_tiids(t, &mut tiids, false, false)
 	}
@@ -101,7 +110,7 @@ impl ExpressionCollector<'_> {
 	/// Lower an AST type into HIR and collect implicit type inst ID declarations
 	pub fn collect_type_with_tiids(
 		&mut self,
-		t: ast::Type,
+		t: minizinc::Type,
 		tiids: &mut TypeInstIdentifiers,
 		is_array_dim: bool,
 		is_fn_parameter: bool,
@@ -111,7 +120,7 @@ impl ExpressionCollector<'_> {
 			return self.alloc_type(origin, Type::Missing);
 		}
 		let ty = match t {
-			ast::Type::ArrayType(a) => Type::Array {
+			minizinc::Type::ArrayType(a) => Type::Array {
 				opt: OptType::NonOpt,
 				dimensions: {
 					let dims: Box<[_]> = a
@@ -137,7 +146,7 @@ impl ExpressionCollector<'_> {
 					is_fn_parameter,
 				),
 			},
-			ast::Type::SetType(s) => Type::Set {
+			minizinc::Type::SetType(s) => Type::Set {
 				inst: s.var_type(),
 				opt: s.opt_type(),
 				element: self.collect_type_with_tiids(
@@ -147,14 +156,14 @@ impl ExpressionCollector<'_> {
 					is_fn_parameter,
 				),
 			},
-			ast::Type::TupleType(t) => Type::Tuple {
+			minizinc::Type::TupleType(t) => Type::Tuple {
 				opt: OptType::NonOpt,
 				fields: t
 					.fields()
 					.map(|f| self.collect_type_with_tiids(f, tiids, false, is_fn_parameter))
 					.collect(),
 			},
-			ast::Type::RecordType(r) => Type::Record {
+			minizinc::Type::RecordType(r) => Type::Record {
 				opt: OptType::NonOpt,
 				fields: r
 					.fields()
@@ -171,7 +180,7 @@ impl ExpressionCollector<'_> {
 					})
 					.collect(),
 			},
-			ast::Type::OperationType(o) => Type::Operation {
+			minizinc::Type::OperationType(o) => Type::Operation {
 				opt: OptType::NonOpt,
 				return_type: self.collect_type_with_tiids(
 					o.return_type(),
@@ -184,57 +193,57 @@ impl ExpressionCollector<'_> {
 					.map(|p| self.collect_type_with_tiids(p, tiids, false, is_fn_parameter))
 					.collect(),
 			},
-			ast::Type::TypeBase(b) => {
+			minizinc::Type::TypeBase(b) => {
 				self.collect_type_base(b, tiids, is_array_dim, is_fn_parameter)
 			}
-			ast::Type::AnyType(_) => Type::Any,
+			minizinc::Type::AnyType(_) => Type::Any,
 		};
 		self.alloc_type(origin, ty)
 	}
 
 	/// Lower an AST pattern into HIR
-	pub fn collect_pattern(&mut self, p: ast::Pattern) -> ArenaIndex<Pattern> {
+	pub fn collect_pattern(&mut self, p: minizinc::Pattern) -> ArenaIndex<Pattern> {
 		let origin = Origin::new(&p);
 		if p.is_missing() {
 			return self.alloc_pattern(origin, Pattern::Missing);
 		}
 		match p {
-			ast::Pattern::Identifier(i) => {
+			minizinc::Pattern::Identifier(i) => {
 				let identifier = Identifier::new(i.name(), self.db);
 				self.alloc_pattern(origin, identifier)
 			}
-			ast::Pattern::Anonymous(_) => self.alloc_pattern(origin, Pattern::Anonymous),
-			ast::Pattern::Absent(_) => self.alloc_pattern(origin, Pattern::Absent),
-			ast::Pattern::BooleanLiteral(b) => {
+			minizinc::Pattern::Anonymous(_) => self.alloc_pattern(origin, Pattern::Anonymous),
+			minizinc::Pattern::Absent(_) => self.alloc_pattern(origin, Pattern::Absent),
+			minizinc::Pattern::BooleanLiteral(b) => {
 				self.alloc_pattern(origin, Pattern::Boolean(BooleanLiteral(b.value())))
 			}
-			ast::Pattern::StringLiteral(s) => self.alloc_pattern(
+			minizinc::Pattern::StringLiteral(s) => self.alloc_pattern(
 				origin,
 				Pattern::String(StringLiteral::new(s.value(), self.db)),
 			),
-			ast::Pattern::PatternNumericLiteral(n) => match n.value() {
-				ast::NumericLiteral::IntegerLiteral(i) => self.alloc_pattern(
+			minizinc::Pattern::PatternNumericLiteral(n) => match n.value() {
+				minizinc::NumericLiteral::IntegerLiteral(i) => self.alloc_pattern(
 					origin,
 					Pattern::Integer {
 						negated: n.negated(),
 						value: IntegerLiteral(i.value()),
 					},
 				),
-				ast::NumericLiteral::FloatLiteral(f) => self.alloc_pattern(
+				minizinc::NumericLiteral::FloatLiteral(f) => self.alloc_pattern(
 					origin,
 					Pattern::Float {
 						negated: n.negated(),
 						value: FloatLiteral::new(f.value()),
 					},
 				),
-				ast::NumericLiteral::Infinity(_) => self.alloc_pattern(
+				minizinc::NumericLiteral::Infinity(_) => self.alloc_pattern(
 					origin,
 					Pattern::Infinity {
 						negated: n.negated(),
 					},
 				),
 			},
-			ast::Pattern::Call(c) => {
+			minizinc::Pattern::Call(c) => {
 				let ident = c.identifier();
 				let pattern = Pattern::Call {
 					function: self
@@ -243,13 +252,13 @@ impl ExpressionCollector<'_> {
 				};
 				self.alloc_pattern(origin, pattern)
 			}
-			ast::Pattern::Tuple(t) => {
+			minizinc::Pattern::Tuple(t) => {
 				let pattern = Pattern::Tuple {
 					fields: t.fields().map(|f| self.collect_pattern(f)).collect(),
 				};
 				self.alloc_pattern(origin, pattern)
 			}
-			ast::Pattern::Record(r) => {
+			minizinc::Pattern::Record(r) => {
 				let pattern = Pattern::Record {
 					fields: r
 						.fields()
@@ -274,15 +283,15 @@ impl ExpressionCollector<'_> {
 
 	fn collect_type_base(
 		&mut self,
-		b: ast::TypeBase,
+		b: minizinc::TypeBase,
 		tiids: &mut TypeInstIdentifiers,
 		is_array_dim: bool,
 		is_fn_parameter: bool,
 	) -> Type {
 		match b.domain() {
-			ast::Domain::Bounded(e) => {
+			minizinc::Domain::Bounded(e) => {
 				if is_array_dim && b.var_type().is_none() && b.opt_type().is_none() {
-					if let ast::Expression::Anonymous(_) = e {
+					if let minizinc::Expression::Anonymous(_) = e {
 						if is_fn_parameter {
 							let pattern =
 								self.alloc_pattern(Origin::new(&e), Identifier::new("_", self.db));
@@ -309,12 +318,12 @@ impl ExpressionCollector<'_> {
 					domain: self.collect_expression(e),
 				}
 			}
-			ast::Domain::Unbounded(u) => Type::Primitive {
+			minizinc::Domain::Unbounded(u) => Type::Primitive {
 				inst: b.var_type().unwrap_or(VarType::Par),
 				opt: b.opt_type().unwrap_or(OptType::NonOpt),
 				primitive_type: u.primitive_type(),
 			},
-			ast::Domain::TypeInstIdentifier(tiid) => {
+			minizinc::Domain::TypeInstIdentifier(tiid) => {
 				let ident = Identifier::new(tiid.name(), self.db);
 				let origin = Origin::new(&tiid);
 				let (inst, opt) = match (b.any_type(), b.var_type(), b.opt_type()) {
@@ -349,7 +358,7 @@ impl ExpressionCollector<'_> {
 					domain: self.alloc_expression(origin, ident),
 				}
 			}
-			ast::Domain::TypeInstEnumIdentifier(tiid) => {
+			minizinc::Domain::TypeInstEnumIdentifier(tiid) => {
 				let ident = Identifier::new(tiid.name(), self.db);
 				let origin = Origin::new(&tiid);
 				tiids
@@ -385,13 +394,13 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_set_literal(&mut self, sl: ast::SetLiteral) -> SetLiteral {
+	fn collect_set_literal(&mut self, sl: minizinc::SetLiteral) -> SetLiteral {
 		SetLiteral {
 			members: sl.members().map(|e| self.collect_expression(e)).collect(),
 		}
 	}
 
-	fn collect_array_literal(&mut self, al: ast::ArrayLiteral) -> ArenaIndex<Expression> {
+	fn collect_array_literal(&mut self, al: minizinc::ArrayLiteral) -> ArenaIndex<Expression> {
 		let (indices, values): (Vec<_>, Vec<_>) = al
 			.members()
 			.map(|m| {
@@ -438,7 +447,7 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_2d_array_literal(&mut self, al: ast::ArrayLiteral2D) -> ArenaIndex<Expression> {
+	fn collect_2d_array_literal(&mut self, al: minizinc::ArrayLiteral2D) -> ArenaIndex<Expression> {
 		// Desugar into array2d call
 		let origin = Origin::new(&al);
 		let col_indices = al
@@ -515,12 +524,12 @@ impl ExpressionCollector<'_> {
 		)
 	}
 
-	fn collect_array_access(&mut self, aa: ast::ArrayAccess) -> ArrayAccess {
+	fn collect_array_access(&mut self, aa: minizinc::ArrayAccess) -> ArrayAccess {
 		let indices = aa
 			.indices()
 			.map(|i| match i {
-				ast::ArrayIndex::Expression(e) => self.collect_expression(e),
-				ast::ArrayIndex::IndexSlice(s) => self.alloc_expression(
+				minizinc::ArrayIndex::Expression(e) => self.collect_expression(e),
+				minizinc::ArrayIndex::IndexSlice(s) => self.alloc_expression(
 					Origin::new(&s),
 					Expression::Slice(Identifier::new(s.operator(), self.db)),
 				),
@@ -536,7 +545,10 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_array_comprehension(&mut self, c: ast::ArrayComprehension) -> ArrayComprehension {
+	fn collect_array_comprehension(
+		&mut self,
+		c: minizinc::ArrayComprehension,
+	) -> ArrayComprehension {
 		ArrayComprehension {
 			generators: c.generators().map(|g| self.collect_generator(g)).collect(),
 			indices: c.indices().map(|i| self.collect_expression(i)),
@@ -544,21 +556,21 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_set_comprehension(&mut self, c: ast::SetComprehension) -> SetComprehension {
+	fn collect_set_comprehension(&mut self, c: minizinc::SetComprehension) -> SetComprehension {
 		SetComprehension {
 			generators: c.generators().map(|g| self.collect_generator(g)).collect(),
 			template: self.collect_expression(c.template()),
 		}
 	}
 
-	fn collect_generator(&mut self, g: ast::Generator) -> Generator {
+	fn collect_generator(&mut self, g: minizinc::Generator) -> Generator {
 		match g {
-			ast::Generator::IteratorGenerator(i) => Generator::Iterator {
+			minizinc::Generator::IteratorGenerator(i) => Generator::Iterator {
 				patterns: i.patterns().map(|p| self.collect_pattern(p)).collect(),
 				collection: self.collect_expression(i.collection()),
 				where_clause: i.where_clause().map(|w| self.collect_expression(w)),
 			},
-			ast::Generator::AssignmentGenerator(a) => Generator::Assignment {
+			minizinc::Generator::AssignmentGenerator(a) => Generator::Assignment {
 				pattern: self.collect_pattern(a.pattern()),
 				value: self.collect_expression(a.value()),
 				where_clause: a.where_clause().map(|w| self.collect_expression(w)),
@@ -566,7 +578,7 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_if_then_else(&mut self, ite: ast::IfThenElse) -> IfThenElse {
+	fn collect_if_then_else(&mut self, ite: minizinc::IfThenElse) -> IfThenElse {
 		IfThenElse {
 			branches: ite
 				.branches()
@@ -579,14 +591,14 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_call(&mut self, c: ast::Call) -> Call {
+	fn collect_call(&mut self, c: minizinc::Call) -> Call {
 		Call {
 			arguments: c.arguments().map(|a| self.collect_expression(a)).collect(),
 			function: self.collect_expression(c.function()),
 		}
 	}
 
-	fn collect_infix_operator(&mut self, o: ast::InfixOperator) -> ArenaIndex<Expression> {
+	fn collect_infix_operator(&mut self, o: minizinc::InfixOperator) -> ArenaIndex<Expression> {
 		let arguments = [o.left(), o.right()]
 			.into_iter()
 			.map(|a| self.collect_expression(a))
@@ -610,7 +622,7 @@ impl ExpressionCollector<'_> {
 		)
 	}
 
-	fn collect_prefix_operator(&mut self, o: ast::PrefixOperator) -> ArenaIndex<Expression> {
+	fn collect_prefix_operator(&mut self, o: minizinc::PrefixOperator) -> ArenaIndex<Expression> {
 		let arguments = Box::new([self.collect_expression(o.operand())]);
 		let operator = o.operator();
 		let function = self.ident_exp(Origin::new(&operator), operator.name());
@@ -623,7 +635,7 @@ impl ExpressionCollector<'_> {
 		)
 	}
 
-	fn collect_postfix_operator(&mut self, o: ast::PostfixOperator) -> ArenaIndex<Expression> {
+	fn collect_postfix_operator(&mut self, o: minizinc::PostfixOperator) -> ArenaIndex<Expression> {
 		let arguments = Box::new([self.collect_expression(o.operand())]);
 		let operator = o.operator();
 		let function = self.ident_exp(Origin::new(&operator), format!("{}o", operator.name()));
@@ -636,7 +648,7 @@ impl ExpressionCollector<'_> {
 		)
 	}
 
-	fn collect_generator_call(&mut self, c: ast::GeneratorCall) -> ArenaIndex<Expression> {
+	fn collect_generator_call(&mut self, c: minizinc::GeneratorCall) -> ArenaIndex<Expression> {
 		// Desugar into call with comprehension as argument
 		let origin = Origin::new(&c);
 		let comp = ArrayComprehension {
@@ -657,17 +669,17 @@ impl ExpressionCollector<'_> {
 
 	fn collect_string_interpolation(
 		&mut self,
-		s: ast::StringInterpolation,
+		s: minizinc::StringInterpolation,
 	) -> ArenaIndex<Expression> {
 		// Desugar into concat() of show() calls
 		let origin = Origin::new(&s);
 		let strings = s
 			.contents()
 			.map(|c| match c {
-				ast::InterpolationItem::String(v) => {
+				minizinc::InterpolationItem::String(v) => {
 					self.alloc_expression(origin.clone(), StringLiteral::new(v, self.db))
 				}
-				ast::InterpolationItem::Expression(e) => {
+				minizinc::InterpolationItem::Expression(e) => {
 					let arguments = Box::new([self.collect_expression(e.clone())]);
 					let function = self.alloc_expression(Origin::new(&e), self.identifiers.show);
 					self.alloc_expression(
@@ -693,7 +705,7 @@ impl ExpressionCollector<'_> {
 		)
 	}
 
-	fn collect_case(&mut self, c: ast::Case) -> Case {
+	fn collect_case(&mut self, c: minizinc::Case) -> Case {
 		let expression = self.collect_expression(c.expression());
 		let cases = c
 			.cases()
@@ -705,7 +717,7 @@ impl ExpressionCollector<'_> {
 		Case { expression, cases }
 	}
 
-	fn collect_let(&mut self, l: ast::Let) -> Let {
+	fn collect_let(&mut self, l: minizinc::Let) -> Let {
 		let items = l.items().map(|i| self.collect_let_item(i)).collect();
 		let in_expression = self.collect_expression(l.in_expression());
 		Let {
@@ -714,9 +726,9 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_let_item(&mut self, i: ast::LetItem) -> LetItem {
+	fn collect_let_item(&mut self, i: minizinc::LetItem) -> LetItem {
 		match i {
-			ast::LetItem::Declaration(d) => {
+			minizinc::LetItem::Declaration(d) => {
 				let declared_type = self.collect_type(d.declared_type());
 				Declaration {
 					pattern: self.collect_pattern(d.pattern()),
@@ -729,7 +741,7 @@ impl ExpressionCollector<'_> {
 				}
 				.into()
 			}
-			ast::LetItem::Constraint(c) => Constraint {
+			minizinc::LetItem::Constraint(c) => Constraint {
 				expression: self.collect_expression(c.expression()),
 				annotations: c
 					.annotations()
@@ -740,13 +752,13 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_tuple_literal(&mut self, t: ast::TupleLiteral) -> TupleLiteral {
+	fn collect_tuple_literal(&mut self, t: minizinc::TupleLiteral) -> TupleLiteral {
 		TupleLiteral {
 			fields: t.members().map(|m| self.collect_expression(m)).collect(),
 		}
 	}
 
-	fn collect_record_literal(&mut self, r: ast::RecordLiteral) -> RecordLiteral {
+	fn collect_record_literal(&mut self, r: minizinc::RecordLiteral) -> RecordLiteral {
 		RecordLiteral {
 			fields: r
 				.members()
@@ -760,21 +772,21 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_tuple_access(&mut self, t: ast::TupleAccess) -> TupleAccess {
+	fn collect_tuple_access(&mut self, t: minizinc::TupleAccess) -> TupleAccess {
 		TupleAccess {
 			field: IntegerLiteral(t.field().value()),
 			tuple: self.collect_expression(t.tuple()),
 		}
 	}
 
-	fn collect_record_access(&mut self, r: ast::RecordAccess) -> RecordAccess {
+	fn collect_record_access(&mut self, r: minizinc::RecordAccess) -> RecordAccess {
 		RecordAccess {
 			record: self.collect_expression(r.record()),
 			field: Identifier::new(r.field().name(), self.db),
 		}
 	}
 
-	fn collect_lambda(&mut self, l: ast::Lambda) -> Lambda {
+	fn collect_lambda(&mut self, l: minizinc::Lambda) -> Lambda {
 		Lambda {
 			return_type: l.return_type().map(|r| self.collect_type(r)),
 			parameters: l
@@ -799,7 +811,7 @@ impl ExpressionCollector<'_> {
 
 	fn collect_annotated_expression(
 		&mut self,
-		e: ast::AnnotatedExpression,
+		e: minizinc::AnnotatedExpression,
 	) -> ArenaIndex<Expression> {
 		let annotations = e
 			.annotations()

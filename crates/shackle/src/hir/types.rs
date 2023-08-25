@@ -6,7 +6,7 @@ use crate::arena::ArenaIndex;
 
 use super::{Expression, ItemData, Pattern};
 
-pub use crate::syntax::ast::{OptType, PrimitiveType, VarType};
+pub use crate::syntax::minizinc::{OptType, PrimitiveType, VarType};
 
 /// Type of an expression
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

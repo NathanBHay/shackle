@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::{
 	db::{CompilerDatabase, Inputs},
 	diagnostics::Diagnostics,
-	file::InputFile,
+	file::{InputFile, InputLang},
 	hir::db::Hir,
 	Error,
 };
@@ -28,6 +28,6 @@ pub fn sanity_check_thir(db: &dyn Thir) -> Arc<Diagnostics<Error>> {
 
 	let mut new_db = CompilerDatabase::default();
 	new_db.set_ignore_stdlib(true);
-	new_db.set_input_files(Arc::new(vec![InputFile::ModelString(code)]));
+	new_db.set_input_files(Arc::new(vec![InputFile::String(code, InputLang::MiniZinc)]));
 	new_db.all_errors()
 }

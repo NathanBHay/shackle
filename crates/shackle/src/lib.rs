@@ -20,7 +20,7 @@ pub mod utils;
 
 use db::{CompilerDatabase, Inputs};
 use diagnostics::ShackleError;
-use file::InputFile;
+use file::{InputFile, InputLang};
 use serde_json::Map;
 
 use std::{
@@ -54,14 +54,15 @@ impl Model {
 	/// Create a Model from the file at the given path
 	pub fn from_file(path: PathBuf) -> Model {
 		let mut db = db::CompilerDatabase::default();
-		db.set_input_files(Arc::new(vec![InputFile::Path(path)]));
+		let l = InputLang::from_extension(path.extension());
+		db.set_input_files(Arc::new(vec![InputFile::Path(path, l)]));
 		Model { db }
 	}
 
 	/// Create a Model from the given string
-	pub fn from_string(m: String) -> Model {
+	pub fn from_string(m: String, l: InputLang) -> Model {
 		let mut db = db::CompilerDatabase::default();
-		db.set_input_files(Arc::new(vec![InputFile::ModelString(m)]));
+		db.set_input_files(Arc::new(vec![InputFile::String(m, l)]));
 		Model { db }
 	}
 

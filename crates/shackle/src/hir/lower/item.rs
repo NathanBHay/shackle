@@ -7,7 +7,8 @@ use crate::hir::db::Hir;
 use crate::hir::ids::ItemRef;
 use crate::hir::source::{Origin, SourceMap};
 use crate::hir::*;
-use crate::syntax::ast::{self, AstNode};
+use crate::syntax::ast::{AstNode, ConstraintModel};
+use crate::syntax::minizinc;
 use crate::Error;
 
 use super::{ExpressionCollector, TypeInstIdentifiers};
@@ -18,13 +19,20 @@ pub fn lower_items(db: &dyn Hir, model: ModelRef) -> (Arc<Model>, Arc<SourceMap>
 		Ok(m) => m,
 		Err(e) => return (Default::default(), Default::default(), Arc::new(vec![e])),
 	};
-	let identifiers = IdentifierRegistry::new(db);
-	let mut ctx = ItemCollector::new(db, &identifiers, model);
-	for item in ast.items() {
-		ctx.collect_item(item);
+	match ast {
+		ConstraintModel::MznModel(ast) => {
+			let identifiers = IdentifierRegistry::new(db);
+			let mut ctx = ItemCollector::new(db, &identifiers, model);
+			for item in ast.items() {
+				ctx.collect_item(item);
+			}
+			let (m, sm, e) = ctx.finish();
+			(Arc::new(m), Arc::new(sm), Arc::new(e))
+		}
+		ConstraintModel::EPrimeModel(_) => {
+			todo!("Nathan: this is where the main transformation to HIR has to happen")
+		}
 	}
-	let (m, sm, e) = ctx.finish();
-	(Arc::new(m), Arc::new(sm), Arc::new(e))
 }
 
 /// Collects AST items into an HIR model
@@ -55,19 +63,19 @@ impl ItemCollector<'_> {
 	}
 
 	/// Lower an AST item to HIR
-	pub fn collect_item(&mut self, item: ast::Item) {
+	pub fn collect_item(&mut self, item: minizinc::Item) {
 		let (it, sm) = match item.clone() {
-			ast::Item::Annotation(a) => self.collect_annotation(a),
-			ast::Item::Assignment(a) => self.collect_assignment(a),
-			ast::Item::Constraint(c) => self.collect_constraint(c),
-			ast::Item::Declaration(d) => self.collect_declaration(d),
-			ast::Item::Enumeration(e) => self.collect_enumeration(e),
-			ast::Item::Function(f) => self.collect_function(f),
-			ast::Item::Include(_i) => return,
-			ast::Item::Output(i) => self.collect_output(i),
-			ast::Item::Predicate(p) => self.collect_predicate(p),
-			ast::Item::Solve(s) => self.collect_solve(s),
-			ast::Item::TypeAlias(t) => self.collect_type_alias(t),
+			minizinc::Item::Annotation(a) => self.collect_annotation(a),
+			minizinc::Item::Assignment(a) => self.collect_assignment(a),
+			minizinc::Item::Constraint(c) => self.collect_constraint(c),
+			minizinc::Item::Declaration(d) => self.collect_declaration(d),
+			minizinc::Item::Enumeration(e) => self.collect_enumeration(e),
+			minizinc::Item::Function(f) => self.collect_function(f),
+			minizinc::Item::Include(_i) => return,
+			minizinc::Item::Output(i) => self.collect_output(i),
+			minizinc::Item::Predicate(p) => self.collect_predicate(p),
+			minizinc::Item::Solve(s) => self.collect_solve(s),
+			minizinc::Item::TypeAlias(t) => self.collect_type_alias(t),
 		};
 		self.source_map.insert(it.into(), Origin::new(&item));
 		self.source_map.add_from_item_data(self.db, it, &sm);
@@ -78,7 +86,7 @@ impl ItemCollector<'_> {
 		(self.model, self.source_map, self.diagnostics)
 	}
 
-	fn collect_annotation(&mut self, a: ast::Annotation) -> (ItemRef, ItemDataSourceMap) {
+	fn collect_annotation(&mut self, a: minizinc::Annotation) -> (ItemRef, ItemDataSourceMap) {
 		let mut ctx = ExpressionCollector::new(self.db, self.identifiers, &mut self.diagnostics);
 		let name = Identifier::new(a.id().name(), self.db);
 		let pattern = ctx.alloc_pattern(Origin::new(&a.id()), name);
@@ -111,11 +119,11 @@ impl ItemCollector<'_> {
 		(ItemRef::new(self.db, self.owner, index), source_map)
 	}
 
-	fn collect_assignment(&mut self, a: ast::Assignment) -> (ItemRef, ItemDataSourceMap) {
+	fn collect_assignment(&mut self, a: minizinc::Assignment) -> (ItemRef, ItemDataSourceMap) {
 		let mut ctx = ExpressionCollector::new(self.db, self.identifiers, &mut self.diagnostics);
 		let assignee = ctx.collect_expression(a.assignee());
 
-		if let ast::Expression::Identifier(i) = a.assignee() {
+		if let minizinc::Expression::Identifier(i) = a.assignee() {
 			if self
 				.db
 				.enumeration_names()
@@ -126,7 +134,7 @@ impl ItemCollector<'_> {
 				let mut todo = vec![a.definition()];
 				while let Some(e) = todo.pop() {
 					match e {
-						ast::Expression::Identifier(i) => {
+						minizinc::Expression::Identifier(i) => {
 							definition.push(
 								Constructor::Atom {
 									pattern: ctx.collect_pattern(i.into()),
@@ -134,11 +142,11 @@ impl ItemCollector<'_> {
 								.into(),
 							);
 						}
-						ast::Expression::SetLiteral(sl) => {
+						minizinc::Expression::SetLiteral(sl) => {
 							todo.extend(sl.members());
 						}
-						ast::Expression::Call(c) => {
-							if let ast::Expression::Identifier(i) = c.function() {
+						minizinc::Expression::Call(c) => {
+							if let minizinc::Expression::Identifier(i) = c.function() {
 								let parameters = c
 									.arguments()
 									.map(|arg| {
@@ -180,7 +188,7 @@ impl ItemCollector<'_> {
 								}
 							}
 						}
-						ast::Expression::InfixOperator(o) => {
+						minizinc::Expression::InfixOperator(o) => {
 							todo.push(o.left());
 							todo.push(o.right());
 						}
@@ -222,7 +230,7 @@ impl ItemCollector<'_> {
 		(ItemRef::new(self.db, self.owner, index), source_map)
 	}
 
-	fn collect_constraint(&mut self, c: ast::Constraint) -> (ItemRef, ItemDataSourceMap) {
+	fn collect_constraint(&mut self, c: minizinc::Constraint) -> (ItemRef, ItemDataSourceMap) {
 		let mut ctx = ExpressionCollector::new(self.db, self.identifiers, &mut self.diagnostics);
 		let annotations = c
 			.annotations()
@@ -241,7 +249,7 @@ impl ItemCollector<'_> {
 		(ItemRef::new(self.db, self.owner, index), source_map)
 	}
 
-	fn collect_declaration(&mut self, d: ast::Declaration) -> (ItemRef, ItemDataSourceMap) {
+	fn collect_declaration(&mut self, d: minizinc::Declaration) -> (ItemRef, ItemDataSourceMap) {
 		let mut ctx = ExpressionCollector::new(self.db, self.identifiers, &mut self.diagnostics);
 		let pattern = ctx.collect_pattern(d.pattern());
 		let declared_type = ctx.collect_type(d.declared_type());
@@ -264,7 +272,7 @@ impl ItemCollector<'_> {
 		(ItemRef::new(self.db, self.owner, index), source_map)
 	}
 
-	fn collect_enumeration(&mut self, e: ast::Enumeration) -> (ItemRef, ItemDataSourceMap) {
+	fn collect_enumeration(&mut self, e: minizinc::Enumeration) -> (ItemRef, ItemDataSourceMap) {
 		let mut ctx = ExpressionCollector::new(self.db, self.identifiers, &mut self.diagnostics);
 		let pattern = ctx.collect_pattern(e.id().into());
 		// Flatten cases
@@ -272,14 +280,14 @@ impl ItemCollector<'_> {
 		let mut cases = Vec::new();
 		for case in e.cases() {
 			match case {
-				ast::EnumerationCase::Members(m) => {
+				minizinc::EnumerationCase::Members(m) => {
 					has_rhs = true;
 					for i in m.members() {
 						let pattern = ctx.collect_pattern(i.into());
 						cases.push(Constructor::Atom { pattern }.into());
 					}
 				}
-				ast::EnumerationCase::Constructor(c) => {
+				minizinc::EnumerationCase::Constructor(c) => {
 					has_rhs = true;
 					let name = Identifier::new(c.id().name(), self.db);
 					let parameters = c
@@ -299,7 +307,7 @@ impl ItemCollector<'_> {
 						.into(),
 					);
 				}
-				ast::EnumerationCase::Anonymous(a) => {
+				minizinc::EnumerationCase::Anonymous(a) => {
 					has_rhs = true;
 					let pattern = ctx.collect_pattern(a.anonymous().into());
 					let parameters = a
@@ -337,7 +345,7 @@ impl ItemCollector<'_> {
 		(ItemRef::new(self.db, self.owner, index), source_map)
 	}
 
-	fn collect_function(&mut self, f: ast::Function) -> (ItemRef, ItemDataSourceMap) {
+	fn collect_function(&mut self, f: minizinc::Function) -> (ItemRef, ItemDataSourceMap) {
 		let mut ctx = ExpressionCollector::new(self.db, self.identifiers, &mut self.diagnostics);
 		let annotations = f
 			.annotations()
@@ -380,7 +388,7 @@ impl ItemCollector<'_> {
 		(ItemRef::new(self.db, self.owner, index), source_map)
 	}
 
-	fn collect_output(&mut self, i: ast::Output) -> (ItemRef, ItemDataSourceMap) {
+	fn collect_output(&mut self, i: minizinc::Output) -> (ItemRef, ItemDataSourceMap) {
 		let mut ctx = ExpressionCollector::new(self.db, self.identifiers, &mut self.diagnostics);
 		let section = i.section().map(|s| ctx.collect_expression(s.into()));
 		let expression = ctx.collect_expression(i.expression());
@@ -396,7 +404,7 @@ impl ItemCollector<'_> {
 		(ItemRef::new(self.db, self.owner, index), source_map)
 	}
 
-	fn collect_predicate(&mut self, f: ast::Predicate) -> (ItemRef, ItemDataSourceMap) {
+	fn collect_predicate(&mut self, f: minizinc::Predicate) -> (ItemRef, ItemDataSourceMap) {
 		let mut ctx = ExpressionCollector::new(self.db, self.identifiers, &mut self.diagnostics);
 
 		let annotations = f
@@ -409,8 +417,8 @@ impl ItemCollector<'_> {
 			Origin::new(&f),
 			Type::Primitive {
 				inst: match f.declared_type() {
-					ast::PredicateType::Predicate => VarType::Var,
-					ast::PredicateType::Test => VarType::Par,
+					minizinc::PredicateType::Predicate => VarType::Var,
+					minizinc::PredicateType::Test => VarType::Par,
 				},
 				opt: OptType::NonOpt,
 				primitive_type: PrimitiveType::Bool,
@@ -450,28 +458,28 @@ impl ItemCollector<'_> {
 		(ItemRef::new(self.db, self.owner, index), source_map)
 	}
 
-	fn collect_solve(&mut self, s: ast::Solve) -> (ItemRef, ItemDataSourceMap) {
+	fn collect_solve(&mut self, s: minizinc::Solve) -> (ItemRef, ItemDataSourceMap) {
 		let mut ctx = ExpressionCollector::new(self.db, self.identifiers, &mut self.diagnostics);
 		let annotations = s
 			.annotations()
 			.map(|ann| ctx.collect_expression(ann))
 			.collect();
 		let goal = match s.goal() {
-			ast::Goal::Maximize(objective) => Goal::Maximize {
+			minizinc::Goal::Maximize(objective) => Goal::Maximize {
 				pattern: ctx.alloc_pattern(
 					Origin::new(&objective),
 					Pattern::Identifier(self.identifiers.objective),
 				),
 				objective: ctx.collect_expression(objective),
 			},
-			ast::Goal::Minimize(objective) => Goal::Minimize {
+			minizinc::Goal::Minimize(objective) => Goal::Minimize {
 				pattern: ctx.alloc_pattern(
 					Origin::new(&objective),
 					Pattern::Identifier(self.identifiers.objective),
 				),
 				objective: ctx.collect_expression(objective),
 			},
-			ast::Goal::Satisfy => Goal::Satisfy,
+			minizinc::Goal::Satisfy => Goal::Satisfy,
 		};
 		let (data, source_map) = ctx.finish();
 		let index = self
@@ -482,7 +490,7 @@ impl ItemCollector<'_> {
 		(ItemRef::new(self.db, self.owner, index), source_map)
 	}
 
-	fn collect_type_alias(&mut self, t: ast::TypeAlias) -> (ItemRef, ItemDataSourceMap) {
+	fn collect_type_alias(&mut self, t: minizinc::TypeAlias) -> (ItemRef, ItemDataSourceMap) {
 		let mut ctx = ExpressionCollector::new(self.db, self.identifiers, &mut self.diagnostics);
 		let annotations = t
 			.annotations()

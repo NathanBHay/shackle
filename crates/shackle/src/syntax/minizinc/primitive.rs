@@ -1,8 +1,6 @@
 //! AST representation of primitive values
 
-use super::AstNode;
-
-use super::helpers::*;
+use crate::syntax::ast::{ast_node, decode_string, AstNode};
 
 ast_node!(
 	/// Integer literal
@@ -72,7 +70,7 @@ ast_node!(
 
 #[cfg(test)]
 mod test {
-	use crate::syntax::ast::helpers::test::*;
+	use crate::syntax::ast::test::*;
 	use expect_test::expect;
 
 	#[test]

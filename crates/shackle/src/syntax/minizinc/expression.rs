@@ -2,14 +2,17 @@
 
 use std::borrow::Cow;
 
-use crate::syntax::cst::CstNode;
-
-use super::{helpers::*, Parameter, Type};
 use super::{
-	Absent, ArrayAccess, ArrayComprehension, ArrayLiteral, ArrayLiteral2D, AstNode, BooleanLiteral,
+	Absent, ArrayAccess, ArrayComprehension, ArrayLiteral, ArrayLiteral2D, BooleanLiteral,
 	Children, Constraint, Declaration, FloatLiteral, Generator, Infinity, IntegerLiteral, Pattern,
 	RecordLiteral, SetComprehension, SetLiteral, StringLiteral, TupleLiteral,
 };
+use super::{Parameter, Type};
+use crate::syntax::ast::{
+	ast_enum, ast_node, child_with_field_name, children_with_field_name, decode_string,
+	optional_child_with_field_name, AstNode,
+};
+use crate::syntax::cst::CstNode;
 
 ast_enum!(
 	/// Expression
@@ -496,7 +499,7 @@ impl Lambda {
 
 #[cfg(test)]
 mod test {
-	use crate::syntax::ast::helpers::test::*;
+	use crate::syntax::ast::test::*;
 	use expect_test::expect;
 
 	#[test]
