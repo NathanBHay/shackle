@@ -470,7 +470,6 @@ mod test {
 			r#"include "foo.mzn";"#,
 			expect!([r#"
 MznModel(
-MznModel(
     Model {
         items: [
             Include(
@@ -494,7 +493,6 @@ MznModel(
 		check_ast(
 			"int: x = 3;",
 			expect!([r#"
-MznModel(
 MznModel(
     Model {
         items: [

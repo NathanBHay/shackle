@@ -5,6 +5,7 @@
 
 mod expression;
 mod item;
+mod test;
 
 pub use self::expression::*;
 pub use self::item::*;
