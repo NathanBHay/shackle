@@ -213,10 +213,12 @@ fn test_lower_branching() {
     )
 }
 
+// This test is bad as it only tests the last constraint thus multiple constraints
+// such as `such that x, y` isn't tested
 #[test]
 fn test_lower_constraint() {
     check_lower_item_eprime(
-        "", 
+        "such that x", 
         expect![[r#"
         Item: Constraint { expression: <Expression::1>, annotations: [] }
           Expressions:
