@@ -469,6 +469,8 @@ mod test {
 		check_ast(
 			r#"include "foo.mzn";"#,
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Include(
@@ -481,7 +483,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -491,6 +494,8 @@ mod test {
 		check_ast(
 			"int: x = 3;",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Declaration(
@@ -530,7 +535,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -540,6 +546,8 @@ mod test {
 		check_ast(
 			"enum Foo = {A, B, C};",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Enumeration(
@@ -582,7 +590,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -592,6 +601,8 @@ mod test {
 		check_ast(
 			"x = 1;",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Assignment(
@@ -614,7 +625,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -624,6 +636,8 @@ mod test {
 		check_ast(
 			"constraint x > 1;",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Constraint(
@@ -656,7 +670,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -666,6 +681,8 @@ mod test {
 		check_ast(
 			"solve minimize x;",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Solve(
@@ -685,7 +702,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -695,6 +713,8 @@ mod test {
 		check_ast(
 			r#"output ["foo"];"#,
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Output(
@@ -721,7 +741,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -731,6 +752,8 @@ mod test {
 		check_ast(
 			"function int: foo(int: x) = x + 1;",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Function(
@@ -815,7 +838,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -825,6 +849,8 @@ mod test {
 		check_ast(
 			"type Foo = set of int",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             TypeAlias(
@@ -861,7 +887,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}

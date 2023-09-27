@@ -78,29 +78,31 @@ mod test {
 		check_ast(
 			"x = 1;",
 			expect!([r#"
-    Model {
-        items: [
-            Assignment(
-                Assignment {
-                    cst_kind: "assignment",
-                    assignee: Identifier(
-                        UnquotedIdentifier(
-                            UnquotedIdentifier {
-                                cst_kind: "identifier",
-                                name: "x",
+    MznModel(
+        Model {
+            items: [
+                Assignment(
+                    Assignment {
+                        cst_kind: "assignment",
+                        assignee: Identifier(
+                            UnquotedIdentifier(
+                                UnquotedIdentifier {
+                                    cst_kind: "identifier",
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        definition: IntegerLiteral(
+                            IntegerLiteral {
+                                cst_kind: "integer_literal",
+                                value: 1,
                             },
                         ),
-                    ),
-                    definition: IntegerLiteral(
-                        IntegerLiteral {
-                            cst_kind: "integer_literal",
-                            value: 1,
-                        },
-                    ),
-                },
-            ),
-        ],
-    }
+                    },
+                ),
+            ],
+        },
+    )
 "#]),
 		);
 	}
@@ -110,6 +112,7 @@ mod test {
 		check_ast(
 			"x = 1.2;",
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Assignment(
@@ -132,7 +135,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -142,6 +146,7 @@ mod test {
 		check_ast(
 			r#"x = "foo";"#,
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Assignment(
@@ -164,7 +169,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -174,6 +180,7 @@ mod test {
 		check_ast(
 			"x = <>;",
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Assignment(
@@ -195,7 +202,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -205,6 +213,7 @@ mod test {
 		check_ast(
 			r#"x = infinity;"#,
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Assignment(
@@ -226,7 +235,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}

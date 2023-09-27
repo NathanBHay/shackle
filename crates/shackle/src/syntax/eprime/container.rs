@@ -1,6 +1,6 @@
 //! AST Representation for containers
 
-use super::{Children, Expression, Identifier};
+use super::{Children, Expression};
 use crate::syntax::ast::{
 	ast_node, children_with_field_name,
 	optional_child_with_field_name, AstNode,

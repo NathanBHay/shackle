@@ -39,64 +39,62 @@ mod test {
 
 	#[test]
 	fn test_integer_literal() {
-		check_ast(
-            "letting one be 1", 
-        expect!([r#"
-        Model {
-            items: [
-                Assignment(
-                    Assignment {
-                        cst_kind: "assignment",
-                        assignee: Identifier(
-                            UnquotedIdentifier(
-                                UnquotedIdentifier {
-                                    cst_kind: "identifier",
-                                    name: "one",
+		check_ast_eprime(
+			"letting one be 1",
+			expect!([r#"
+        EPrimeModel(
+            Model {
+                items: [
+                    ConstDefinition(
+                        ConstDefinition {
+                            cst_kind: "const_def",
+                            name: Identifier {
+                                cst_kind: "identifier",
+                                name: "one",
+                            },
+                            definition: IntegerLiteral(
+                                IntegerLiteral {
+                                    cst_kind: "integer_literal",
+                                    value: 1,
                                 },
                             ),
-                        ),
-                        definition: IntegerLiteral(
-                            IntegerLiteral {
-                                cst_kind: "integer_literal",
-                                value: 1,
-                            },
-                        ),
-                    },
-                ),
-            ],
-        }
-"#])
-        );
+                            domain: None,
+                        },
+                    ),
+                ],
+            },
+        )
+"#]),
+		);
 	}
 
 	#[test]
 	fn test_boolean_literal() {
-		check_ast(
-			"constraint x > 1;",
+		check_ast_eprime(
+			"letting T = true",
 			expect!([r#"
-    Model {
-        items: [
-            Assignment(
-                Assignment {
-                    cst_kind: "assignment",
-                    assignee: Identifier(
-                        UnquotedIdentifier(
-                            UnquotedIdentifier {
-                                cst_kind: "identifier",
-                                name: "T",
+            EPrimeModel(
+                Model {
+                    items: [
+                        ConstDefinition(
+                            ConstDefinition {
+                                cst_kind: "const_def",
+                                name: Identifier {
+                                    cst_kind: "identifier",
+                                    name: "T",
+                                },
+                                definition: BooleanLiteral(
+                                    BooleanLiteral {
+                                        cst_kind: "boolean_literal",
+                                        value: true,
+                                    },
+                                ),
+                                domain: None,
                             },
                         ),
-                    ),
-                    definition: BooleanLiteral(
-                        BooleanLiteral {
-                            cst_kind: "boolean_literal",
-                            value: true,
-                        },
-                    ),
+                    ],
                 },
-            ),
-        ],
-    }
+            )
 "#]),
 		);
 	}
