@@ -342,6 +342,7 @@ mod test {
 			array [foo, bar] of bool: y;
 		"#,
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Declaration(
@@ -482,6 +483,7 @@ mod test {
 			tuple(int, tuple(bool, float)): y;
 		"#,
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Declaration(
@@ -620,6 +622,7 @@ mod test {
 			record(int: a, record(bool: c, float: d): b): y;
 		"#,
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Declaration(
@@ -811,6 +814,7 @@ mod test {
 			op(int: (bool, string)): x;
 		"#,
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Declaration(
@@ -899,6 +903,7 @@ mod test {
 			var $$E: i;
 		"#,
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Declaration(
@@ -1023,9 +1028,7 @@ mod test {
                                                 left: IntegerLiteral(
                                                     IntegerLiteral {
                                                         cst_kind: "integer_literal",
-                                                        value: Ok(
-                                                            1,
-                                                        ),
+                                                        value: 1,
                                                     },
                                                 ),
                                                 operator: Operator {
@@ -1035,9 +1038,7 @@ mod test {
                                                 right: IntegerLiteral(
                                                     IntegerLiteral {
                                                         cst_kind: "integer_literal",
-                                                        value: Ok(
-                                                            3,
-                                                        ),
+                                                        value: 3,
                                                     },
                                                 ),
                                             },

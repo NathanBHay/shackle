@@ -309,17 +309,13 @@ MznModel(
                                 IntegerLiteral(
                                     IntegerLiteral {
                                         cst_kind: "integer_literal",
-                                        value: Ok(
-                                            1,
-                                        ),
+                                        value: 1,
                                     },
                                 ),
                                 IntegerLiteral(
                                     IntegerLiteral {
                                         cst_kind: "integer_literal",
-                                        value: Ok(
-                                            2,
-                                        ),
+                                        value: 2,
                                     },
                                 ),
                             ],
@@ -345,9 +341,7 @@ MznModel(
                                 IntegerLiteral(
                                     IntegerLiteral {
                                         cst_kind: "integer_literal",
-                                        value: Ok(
-                                            1,
-                                        ),
+                                        value: 1,
                                     },
                                 ),
                                 TupleLiteral(
@@ -357,17 +351,13 @@ MznModel(
                                             IntegerLiteral(
                                                 IntegerLiteral {
                                                     cst_kind: "integer_literal",
-                                                    value: Ok(
-                                                        2,
-                                                    ),
+                                                    value: 2,
                                                 },
                                             ),
                                             IntegerLiteral(
                                                 IntegerLiteral {
                                                     cst_kind: "integer_literal",
-                                                    value: Ok(
-                                                        3,
-                                                    ),
+                                                    value: 3,
                                                 },
                                             ),
                                         ],
@@ -422,9 +412,7 @@ MznModel(
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                1,
-                                            ),
+                                            value: 1,
                                         },
                                     ),
                                 },
@@ -439,9 +427,7 @@ MznModel(
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                2,
-                                            ),
+                                            value: 2,
                                         },
                                     ),
                                 },
@@ -476,9 +462,7 @@ MznModel(
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                1,
-                                            ),
+                                            value: 1,
                                         },
                                     ),
                                 },
@@ -505,9 +489,7 @@ MznModel(
                                                     value: IntegerLiteral(
                                                         IntegerLiteral {
                                                             cst_kind: "integer_literal",
-                                                            value: Ok(
-                                                                2,
-                                                            ),
+                                                            value: 2,
                                                         },
                                                     ),
                                                 },
@@ -522,9 +504,7 @@ MznModel(
                                                     value: IntegerLiteral(
                                                         IntegerLiteral {
                                                             cst_kind: "integer_literal",
-                                                            value: Ok(
-                                                                3,
-                                                            ),
+                                                            value: 3,
                                                         },
                                                     ),
                                                 },
@@ -570,17 +550,13 @@ MznModel(
                                 IntegerLiteral(
                                     IntegerLiteral {
                                         cst_kind: "integer_literal",
-                                        value: Ok(
-                                            1,
-                                        ),
+                                        value: 1,
                                     },
                                 ),
                                 IntegerLiteral(
                                     IntegerLiteral {
                                         cst_kind: "integer_literal",
-                                        value: Ok(
-                                            2,
-                                        ),
+                                        value: 2,
                                     },
                                 ),
                             ],
@@ -629,9 +605,7 @@ MznModel(
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                1,
-                                            ),
+                                            value: 1,
                                         },
                                     ),
                                 },
@@ -641,9 +615,7 @@ MznModel(
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                3,
-                                            ),
+                                            value: 3,
                                         },
                                     ),
                                 },
@@ -673,18 +645,14 @@ MznModel(
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    2,
-                                                ),
+                                                value: 2,
                                             },
                                         ),
                                     ),
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                1,
-                                            ),
+                                            value: 1,
                                         },
                                     ),
                                 },
@@ -694,9 +662,7 @@ MznModel(
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                3,
-                                            ),
+                                            value: 3,
                                         },
                                     ),
                                 },
@@ -726,18 +692,14 @@ MznModel(
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    0,
-                                                ),
+                                                value: 0,
                                             },
                                         ),
                                     ),
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                1,
-                                            ),
+                                            value: 1,
                                         },
                                     ),
                                 },
@@ -747,18 +709,14 @@ MznModel(
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    1,
-                                                ),
+                                                value: 1,
                                             },
                                         ),
                                     ),
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                3,
-                                            ),
+                                            value: 3,
                                         },
                                     ),
                                 },
@@ -792,17 +750,13 @@ MznModel(
                                                     IntegerLiteral(
                                                         IntegerLiteral {
                                                             cst_kind: "integer_literal",
-                                                            value: Ok(
-                                                                1,
-                                                            ),
+                                                            value: 1,
                                                         },
                                                     ),
                                                     IntegerLiteral(
                                                         IntegerLiteral {
                                                             cst_kind: "integer_literal",
-                                                            value: Ok(
-                                                                1,
-                                                            ),
+                                                            value: 1,
                                                         },
                                                     ),
                                                 ],
@@ -812,9 +766,7 @@ MznModel(
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                1,
-                                            ),
+                                            value: 1,
                                         },
                                     ),
                                 },
@@ -828,17 +780,13 @@ MznModel(
                                                     IntegerLiteral(
                                                         IntegerLiteral {
                                                             cst_kind: "integer_literal",
-                                                            value: Ok(
-                                                                1,
-                                                            ),
+                                                            value: 1,
                                                         },
                                                     ),
                                                     IntegerLiteral(
                                                         IntegerLiteral {
                                                             cst_kind: "integer_literal",
-                                                            value: Ok(
-                                                                2,
-                                                            ),
+                                                            value: 2,
                                                         },
                                                     ),
                                                 ],
@@ -848,9 +796,7 @@ MznModel(
                                     value: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                3,
-                                            ),
+                                            value: 3,
                                         },
                                     ),
                                 },
@@ -905,17 +851,13 @@ MznModel(
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    1,
-                                                ),
+                                                value: 1,
                                             },
                                         ),
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    2,
-                                                ),
+                                                value: 2,
                                             },
                                         ),
                                     ],
@@ -927,17 +869,13 @@ MznModel(
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    3,
-                                                ),
+                                                value: 3,
                                             },
                                         ),
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    4,
-                                                ),
+                                                value: 4,
                                             },
                                         ),
                                     ],
@@ -965,17 +903,13 @@ MznModel(
                                 IntegerLiteral(
                                     IntegerLiteral {
                                         cst_kind: "integer_literal",
-                                        value: Ok(
-                                            1,
-                                        ),
+                                        value: 1,
                                     },
                                 ),
                                 IntegerLiteral(
                                     IntegerLiteral {
                                         cst_kind: "integer_literal",
-                                        value: Ok(
-                                            2,
-                                        ),
+                                        value: 2,
                                     },
                                 ),
                             ],
@@ -987,17 +921,13 @@ MznModel(
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    1,
-                                                ),
+                                                value: 1,
                                             },
                                         ),
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    2,
-                                                ),
+                                                value: 2,
                                             },
                                         ),
                                     ],
@@ -1025,17 +955,13 @@ MznModel(
                                 IntegerLiteral(
                                     IntegerLiteral {
                                         cst_kind: "integer_literal",
-                                        value: Ok(
-                                            1,
-                                        ),
+                                        value: 1,
                                     },
                                 ),
                                 IntegerLiteral(
                                     IntegerLiteral {
                                         cst_kind: "integer_literal",
-                                        value: Ok(
-                                            2,
-                                        ),
+                                        value: 2,
                                     },
                                 ),
                             ],
@@ -1046,9 +972,7 @@ MznModel(
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    1,
-                                                ),
+                                                value: 1,
                                             },
                                         ),
                                     ),
@@ -1056,17 +980,13 @@ MznModel(
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    1,
-                                                ),
+                                                value: 1,
                                             },
                                         ),
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    2,
-                                                ),
+                                                value: 2,
                                             },
                                         ),
                                     ],
@@ -1098,9 +1018,7 @@ MznModel(
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    1,
-                                                ),
+                                                value: 1,
                                             },
                                         ),
                                     ),
@@ -1108,17 +1026,13 @@ MznModel(
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    1,
-                                                ),
+                                                value: 1,
                                             },
                                         ),
                                         IntegerLiteral(
                                             IntegerLiteral {
                                                 cst_kind: "integer_literal",
-                                                value: Ok(
-                                                    2,
-                                                ),
+                                                value: 2,
                                             },
                                         ),
                                     ],
@@ -1174,9 +1088,7 @@ MznModel(
                                     IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                1,
-                                            ),
+                                            value: 1,
                                         },
                                     ),
                                 ),
@@ -1212,9 +1124,7 @@ MznModel(
                                     IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                1,
-                                            ),
+                                            value: 1,
                                         },
                                     ),
                                 ),
@@ -1222,9 +1132,7 @@ MznModel(
                                     IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                2,
-                                            ),
+                                            value: 2,
                                         },
                                     ),
                                 ),
@@ -1260,9 +1168,7 @@ MznModel(
                                     IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
-                                            value: Ok(
-                                                1,
-                                            ),
+                                            value: 1,
                                         },
                                     ),
                                 ),
@@ -1279,9 +1185,7 @@ MznModel(
                                             operand: IntegerLiteral(
                                                 IntegerLiteral {
                                                     cst_kind: "integer_literal",
-                                                    value: Ok(
-                                                        3,
-                                                    ),
+                                                    value: 3,
                                                 },
                                             ),
                                             operator: Operator {
@@ -1334,9 +1238,7 @@ MznModel(
                             template: IntegerLiteral(
                                 IntegerLiteral {
                                     cst_kind: "integer_literal",
-                                    value: Ok(
-                                        1,
-                                    ),
+                                    value: 1,
                                 },
                             ),
                             generators: [
@@ -1421,9 +1323,7 @@ MznModel(
                                                 left: IntegerLiteral(
                                                     IntegerLiteral {
                                                         cst_kind: "integer_literal",
-                                                        value: Ok(
-                                                            1,
-                                                        ),
+                                                        value: 1,
                                                     },
                                                 ),
                                                 operator: Operator {
@@ -1433,9 +1333,7 @@ MznModel(
                                                 right: IntegerLiteral(
                                                     IntegerLiteral {
                                                         cst_kind: "integer_literal",
-                                                        value: Ok(
-                                                            3,
-                                                        ),
+                                                        value: 3,
                                                     },
                                                 ),
                                             },
@@ -1654,9 +1552,7 @@ MznModel(
                                                         right: IntegerLiteral(
                                                             IntegerLiteral {
                                                                 cst_kind: "integer_literal",
-                                                                value: Ok(
-                                                                    1,
-                                                                ),
+                                                                value: 1,
                                                             },
                                                         ),
                                                     },
@@ -1785,9 +1681,7 @@ MznModel(
                                                 left: IntegerLiteral(
                                                     IntegerLiteral {
                                                         cst_kind: "integer_literal",
-                                                        value: Ok(
-                                                            1,
-                                                        ),
+                                                        value: 1,
                                                     },
                                                 ),
                                                 operator: Operator {
@@ -1797,9 +1691,7 @@ MznModel(
                                                 right: IntegerLiteral(
                                                     IntegerLiteral {
                                                         cst_kind: "integer_literal",
-                                                        value: Ok(
-                                                            3,
-                                                        ),
+                                                        value: 3,
                                                     },
                                                 ),
                                             },
@@ -1998,9 +1890,7 @@ MznModel(
                                                 right: IntegerLiteral(
                                                     IntegerLiteral {
                                                         cst_kind: "integer_literal",
-                                                        value: Ok(
-                                                            1,
-                                                        ),
+                                                        value: 1,
                                                     },
                                                 ),
                                             },

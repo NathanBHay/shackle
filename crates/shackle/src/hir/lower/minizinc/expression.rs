@@ -4,7 +4,7 @@ use crate::{
 	arena::ArenaIndex,
 	constants::IdentifierRegistry,
 	db::InternedStringData,
-	diagnostics::{InvalidArrayLiteral, InvalidNumericLiteral, SyntaxError},
+	diagnostics::{InvalidArrayLiteral, SyntaxError},
 	hir::source::Origin,
 	syntax::{ast::AstNode, minizinc},
 	Error,
@@ -48,11 +48,6 @@ impl ExpressionCollector<'_> {
 		expression: minizinc::Expression,
 	) -> ArenaIndex<Expression> {
 		let origin = Origin::new(&expression);
-		log::debug!(
-			"Lowering {} to HIR ({})",
-			expression.cst_node().text(),
-			origin.debug_print(self.db)
-		);
 		if expression.is_missing() {
 			return self.alloc_expression(origin, Expression::Missing);
 		}
@@ -779,15 +774,7 @@ impl ExpressionCollector<'_> {
 
 	fn collect_tuple_access(&mut self, t: minizinc::TupleAccess) -> TupleAccess {
 		TupleAccess {
-			field: IntegerLiteral(t.field().value().unwrap_or_else(|e| {
-				let (src, span) = t.field().cst_node().source_span(self.db.upcast());
-				self.add_diagnostic(InvalidNumericLiteral {
-					src,
-					span,
-					msg: e.to_string(),
-				});
-				1
-			})),
+			field: IntegerLiteral(t.field().value()),
 			tuple: self.collect_expression(t.tuple()),
 		}
 	}
