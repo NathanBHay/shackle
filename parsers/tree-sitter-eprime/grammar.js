@@ -138,7 +138,6 @@ module.exports = grammar({
 				$.identifier,
 				$.indexed_access,
 				$.infix_operator,
-				$.set_in,
 				$.integer_literal,
 				$.matrix_literal,
 				$.prefix_operator,
@@ -211,6 +210,7 @@ module.exports = grammar({
 				[prec.left, PREC.equivalence, "<->"],
 				[prec.left, PREC.implication, "=>"],
 				[prec.left, PREC.equivalence, "<=>"],
+				[prec.left, PREC.set_in, "in"],
 			]
 
 			return choice(
@@ -226,16 +226,6 @@ module.exports = grammar({
 				)
 			)
 		},
-
-		set_in: ($) =>
-			prec.left(
-				PREC.set_in,
-				seq(
-					field("left", $._expression),
-					field("operator", "in"),
-					field("right", $._expression)
-				)
-			),
 
 		absolute_operator: ($) =>
 			prec(PREC.absolute, seq("|", field("operand", $._expression), "|")),

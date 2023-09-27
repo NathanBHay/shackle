@@ -363,7 +363,7 @@ use super::{
 
 #[cfg(test)]
 pub mod test {
-	use crate::syntax::{cst::Cst, minizinc::MznModel, eprime::EPrimeModel, SyntaxModel};
+	use crate::syntax::{cst::Cst, SyntaxModel};
 	use expect_test::{Expect, ExpectFile};
 	use tree_sitter::{Parser, Language};
 
@@ -390,15 +390,20 @@ pub mod test {
 	}
 
 	/// Helper to check parsed AST storing the expected result in a file
-	pub fn check_ast_file(source: &str, expected: ExpectFile) {
+	pub fn check_ast_file_with_lang(language: Language, model:SyntaxModel, source: &str, expected: ExpectFile) {
 		let mut parser = Parser::new();
 		parser
-			.set_language(tree_sitter_minizinc::language())
+			.set_language(language)
 			.unwrap();
 		let tree = parser.parse(source.as_bytes(), None).unwrap();
 		let cst = Cst::from_str(tree, source);
-		let model = MznModel::new(cst);
+		let model = model.new(cst);
 		expected.assert_debug_eq(&model);
+	}
+
+	/// Helper to check parsed AST in MiniZinc storing the expected result in a file
+	pub fn check_ast_file(source: &str, expected: ExpectFile) {
+		check_ast_file_with_lang(tree_sitter_minizinc::language(), SyntaxModel::MznModel, source, expected)
 	}
 }
 
