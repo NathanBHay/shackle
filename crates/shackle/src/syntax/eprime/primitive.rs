@@ -1,10 +1,10 @@
 //! AST representation of primitive values
 
-use crate::syntax::ast::{ast_node, AstNode, children_with_field_name, 
-    optional_child_with_field_name, Children
+use crate::syntax::ast::{
+	ast_node, children_with_field_name, optional_child_with_field_name, AstNode, Children,
 };
 
-use super::{Expression, Domain};
+use super::{Domain, Expression};
 
 ast_node!(
 	/// Integer literal
@@ -37,22 +37,22 @@ impl BooleanLiteral {
 }
 
 ast_node!(
-    /// Matrix Literal
-    MatrixLiteral,
-    members,
-    index
+	/// Matrix Literal
+	MatrixLiteral,
+	members,
+	index
 );
 
 impl MatrixLiteral {
-    /// Get the members of this matrix literal
-    pub fn members(&self) -> Children<'_, Expression> {
-        children_with_field_name(self, "member")
-    }
+	/// Get the members of this matrix literal
+	pub fn members(&self) -> Children<'_, Expression> {
+		children_with_field_name(self, "member")
+	}
 
-    /// Get the index of this matrix literal
-    pub fn index(&self) -> Option<Domain> {
-        optional_child_with_field_name(self, "index")
-    }
+	/// Get the index of this matrix literal
+	pub fn index(&self) -> Option<Domain> {
+		optional_child_with_field_name(self, "index")
+	}
 }
 
 #[cfg(test)]
@@ -71,10 +71,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "one",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "one",
+                                        },
+                                    ),
                                     definition: IntegerLiteral(
                                         IntegerLiteral {
                                             cst_kind: "integer_literal",
@@ -102,10 +104,12 @@ mod test {
                         ConstDefinition(
                             ConstDefinition {
                                 cst_kind: "const_def",
-                                name: Identifier {
-                                    cst_kind: "identifier",
-                                    name: "T",
-                                },
+                                name: Identifier(
+                                    Identifier {
+                                        cst_kind: "identifier",
+                                        name: "T",
+                                    },
+                                ),
                                 definition: BooleanLiteral(
                                     BooleanLiteral {
                                         cst_kind: "boolean_literal",
@@ -118,13 +122,13 @@ mod test {
                     ],
                 },
             )
-"#]),
+            "#]),
 		);
 	}
 
-    #[test]
-    fn test_matrix_literal() {
-        check_ast_eprime(
+	#[test]
+	fn test_matrix_literal() {
+		check_ast_eprime(
             "letting cmatrix: matrix indexed by [ int(1..2), int(1..4) ] of int(1..10) = [ [2,8,5,1], [3,7,9,4] ]",
             expect![[r#"
             EPrimeModel(
@@ -133,10 +137,12 @@ mod test {
                         ConstDefinition(
                             ConstDefinition {
                                 cst_kind: "const_def",
-                                name: Identifier {
-                                    cst_kind: "identifier",
-                                    name: "cmatrix",
-                                },
+                                name: Identifier(
+                                    Identifier {
+                                        cst_kind: "identifier",
+                                        name: "cmatrix",
+                                    },
+                                ),
                                 definition: MatrixLiteral(
                                     MatrixLiteral {
                                         cst_kind: "matrix_literal",
@@ -218,24 +224,24 @@ mod test {
                                                     IntegerDomain {
                                                         cst_kind: "integer_domain",
                                                         range_members: [
-                                                            RangeLiteral(
-                                                                RangeLiteral {
-                                                                    cst_kind: "range_literal",
-                                                                    min: Some(
-                                                                        IntegerLiteral(
-                                                                            IntegerLiteral {
-                                                                                cst_kind: "integer_literal",
-                                                                                value: 1,
-                                                                            },
-                                                                        ),
+                                                            InfixOperator(
+                                                                InfixOperator {
+                                                                    cst_kind: "infix_operator",
+                                                                    operator: Operator {
+                                                                        cst_kind: "..",
+                                                                        name: "..",
+                                                                    },
+                                                                    left: IntegerLiteral(
+                                                                        IntegerLiteral {
+                                                                            cst_kind: "integer_literal",
+                                                                            value: 1,
+                                                                        },
                                                                     ),
-                                                                    max: Some(
-                                                                        IntegerLiteral(
-                                                                            IntegerLiteral {
-                                                                                cst_kind: "integer_literal",
-                                                                                value: 2,
-                                                                            },
-                                                                        ),
+                                                                    right: IntegerLiteral(
+                                                                        IntegerLiteral {
+                                                                            cst_kind: "integer_literal",
+                                                                            value: 2,
+                                                                        },
                                                                     ),
                                                                 },
                                                             ),
@@ -246,24 +252,24 @@ mod test {
                                                     IntegerDomain {
                                                         cst_kind: "integer_domain",
                                                         range_members: [
-                                                            RangeLiteral(
-                                                                RangeLiteral {
-                                                                    cst_kind: "range_literal",
-                                                                    min: Some(
-                                                                        IntegerLiteral(
-                                                                            IntegerLiteral {
-                                                                                cst_kind: "integer_literal",
-                                                                                value: 1,
-                                                                            },
-                                                                        ),
+                                                            InfixOperator(
+                                                                InfixOperator {
+                                                                    cst_kind: "infix_operator",
+                                                                    operator: Operator {
+                                                                        cst_kind: "..",
+                                                                        name: "..",
+                                                                    },
+                                                                    left: IntegerLiteral(
+                                                                        IntegerLiteral {
+                                                                            cst_kind: "integer_literal",
+                                                                            value: 1,
+                                                                        },
                                                                     ),
-                                                                    max: Some(
-                                                                        IntegerLiteral(
-                                                                            IntegerLiteral {
-                                                                                cst_kind: "integer_literal",
-                                                                                value: 4,
-                                                                            },
-                                                                        ),
+                                                                    right: IntegerLiteral(
+                                                                        IntegerLiteral {
+                                                                            cst_kind: "integer_literal",
+                                                                            value: 4,
+                                                                        },
                                                                     ),
                                                                 },
                                                             ),
@@ -275,24 +281,24 @@ mod test {
                                                 IntegerDomain {
                                                     cst_kind: "integer_domain",
                                                     range_members: [
-                                                        RangeLiteral(
-                                                            RangeLiteral {
-                                                                cst_kind: "range_literal",
-                                                                min: Some(
-                                                                    IntegerLiteral(
-                                                                        IntegerLiteral {
-                                                                            cst_kind: "integer_literal",
-                                                                            value: 1,
-                                                                        },
-                                                                    ),
+                                                        InfixOperator(
+                                                            InfixOperator {
+                                                                cst_kind: "infix_operator",
+                                                                operator: Operator {
+                                                                    cst_kind: "..",
+                                                                    name: "..",
+                                                                },
+                                                                left: IntegerLiteral(
+                                                                    IntegerLiteral {
+                                                                        cst_kind: "integer_literal",
+                                                                        value: 1,
+                                                                    },
                                                                 ),
-                                                                max: Some(
-                                                                    IntegerLiteral(
-                                                                        IntegerLiteral {
-                                                                            cst_kind: "integer_literal",
-                                                                            value: 10,
-                                                                        },
-                                                                    ),
+                                                                right: IntegerLiteral(
+                                                                    IntegerLiteral {
+                                                                        cst_kind: "integer_literal",
+                                                                        value: 10,
+                                                                    },
                                                                 ),
                                                             },
                                                         ),
@@ -309,5 +315,5 @@ mod test {
             )
             "#]]
         )
-    }
+	}
 }

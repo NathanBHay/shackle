@@ -1,36 +1,39 @@
 //! AST representation of Eprime Expressions
 
-use super::{BooleanLiteral, IntegerLiteral, MatrixLiteral, Domain};
+use super::{BooleanLiteral, Domain, IntegerLiteral, MatrixLiteral};
 
-use crate::syntax::ast::{ast_enum, ast_node, AstNode, child_with_field_name, 
-    children_with_field_name, Children, optional_child_with_field_name};
+use crate::syntax::ast::{
+    ast_enum, ast_node, child_with_field_name, children_with_field_name,
+    optional_child_with_field_name, AstNode, Children,
+};
 
 ast_enum!(
-	/// Expression
-	Expression,
-	"boolean_literal" => BooleanLiteral,
-	"call" => Call,
-	"identifier" => Identifier,
-	"indexed_access" => IndexedAccess,
-	"infix_operator" => InfixOperator,
-	"integer_literal" => IntegerLiteral,
-	"matrix_literal" => MatrixLiteral,
-	"prefix_operator" => PrefixOperator,
-	"quantification" => Quantification,
-	"matrix_comprehension" => MatrixComprehension,
-	"absolute_operator" => AbsoluteOperator,
+    /// Expression
+    Expression,
+    "boolean_literal" => BooleanLiteral,
+    "call" => Call,
+    "identifier" => Identifier,
+    "indexed_access" => ArrayAccess,
+    "infix_operator" => InfixOperator,
+    "integer_literal" => IntegerLiteral,
+    "matrix_literal" => MatrixLiteral,
+    "prefix_operator" => PrefixOperator,
+    "postfix_operator" => PostfixOperator,
+    "quantification" => Quantification,
+    "matrix_comprehension" => MatrixComprehension,
+    "absolute_operator" => AbsoluteOperator,
 );
 
 ast_node!(
     /// Call
     Call,
-    name,
+    function,
     arguments
 );
 
 impl Call {
     /// Get the name of this call
-    pub fn name(&self) -> Identifier {
+    pub fn function(&self) -> Expression {
         child_with_field_name(self, "function")
     }
 
@@ -41,32 +44,33 @@ impl Call {
 }
 
 ast_node!(
-	/// Identifier
-	Identifier, name
+    /// Identifier
+    Identifier,
+    name
 );
 
 impl Identifier {
-	/// Get the name of this identifier
-	pub fn name(&self) -> &str {
-		self.cst_text()
-	}
+    /// Get the name of this identifier
+    pub fn name(&self) -> &str {
+        self.cst_text()
+    }
 }
 
 ast_node!(
     /// Indexed Access
-    IndexedAccess,
+    ArrayAccess,
     collection,
-    index
+    indices
 );
 
-impl IndexedAccess {
+impl ArrayAccess {
     /// Get the collection of this indexed access
     pub fn collection(&self) -> Expression {
         child_with_field_name(self, "collection")
     }
 
     /// Get the index of this indexed access
-    pub fn index(&self) -> Children<'_, ArrayIndex> {
+    pub fn indices(&self) -> Children<'_, ArrayIndex> {
         children_with_field_name(self, "index")
     }
 }
@@ -74,25 +78,22 @@ impl IndexedAccess {
 ast_enum!(
     /// Array Index
     ArrayIndex,
-    ".." => ArraySlice, // This might be bad
+    ".." => IndexSlice, // This might be bad
     _ => Expression,
 );
 
-ast_node!(
-    ArraySlice,
-    name,
-);
+ast_node!(IndexSlice, operator,);
 
-impl ArraySlice {
+impl IndexSlice {
     /// Get the name of this array slice
-    pub fn name(&self) -> &str {
+    pub fn operator(&self) -> &str {
         self.cst_text()
     }
 }
 
 ast_node!(
     /// Infix Operator
-    InfixOperator, 
+    InfixOperator,
     operator,
     left,
     right
@@ -135,16 +136,35 @@ impl PrefixOperator {
 }
 
 ast_node!(
-	/// An operator node
-	Operator,
-	name,
+    /// Postfix Operator
+    PostfixOperator,
+    operator,
+    operand
+);
+
+impl PostfixOperator {
+    /// Get the operator of this postfix operator
+    pub fn operator(&self) -> Operator {
+        child_with_field_name(self, "operator")
+    }
+
+    /// Get the operand of this postfix operator
+    pub fn operand(&self) -> Expression {
+        child_with_field_name(self, "operand")
+    }
+}
+
+ast_node!(
+    /// An operator node
+    Operator,
+    name,
 );
 
 impl Operator {
-	/// The name of the operator
-	pub fn name(&self) -> &str {
-		self.cst_kind()
-	}
+    /// The name of the operator
+    pub fn name(&self) -> &str {
+        self.cst_kind()
+    }
 }
 
 ast_node!(
@@ -175,13 +195,13 @@ impl Quantification {
 ast_node!(
     /// Generator
     Generator,
-    name,
+    names,
     collection,
 );
 
 impl Generator {
     /// Get the name of this generator
-    pub fn name(&self) -> Children<'_, Identifier> {
+    pub fn names(&self) -> Children<'_, Identifier> {
         children_with_field_name(self, "name")
     }
 
@@ -197,7 +217,7 @@ ast_node!(
     template,
     generators,
     conditions,
-    index
+    indices
 );
 
 impl MatrixComprehension {
@@ -217,7 +237,7 @@ impl MatrixComprehension {
     }
 
     /// Get the index of this matrix comprehension
-    pub fn index(&self) -> Option<Domain> {
+    pub fn indices(&self) -> Option<Domain> {
         optional_child_with_field_name(self, "index")
     }
 }
@@ -237,8 +257,8 @@ impl AbsoluteOperator {
 
 #[cfg(test)]
 mod test {
-	use crate::syntax::ast::test::check_ast_eprime;
-	use expect_test::expect;
+    use crate::syntax::ast::test::check_ast_eprime;
+    use expect_test::expect;
 
     #[test]
     fn test_call() {
@@ -251,17 +271,21 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "simple",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "simple",
+                                        },
+                                    ),
                                     definition: Call(
                                         Call {
                                             cst_kind: "call",
-                                            name: Identifier {
-                                                cst_kind: "identifier",
-                                                name: "toVec",
-                                            },
+                                            function: Identifier(
+                                                Identifier {
+                                                    cst_kind: "identifier",
+                                                    name: "toVec",
+                                                },
+                                            ),
                                             arguments: [
                                                 Identifier(
                                                     Identifier {
@@ -302,12 +326,14 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "single",
-                                    },
-                                    definition: IndexedAccess(
-                                        IndexedAccess {
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "single",
+                                        },
+                                    ),
+                                    definition: ArrayAccess(
+                                        ArrayAccess {
                                             cst_kind: "indexed_access",
                                             collection: Identifier(
                                                 Identifier {
@@ -315,7 +341,7 @@ mod test {
                                                     name: "M",
                                                 },
                                             ),
-                                            index: [
+                                            indices: [
                                                 Expression(
                                                     Identifier(
                                                         Identifier {
@@ -333,12 +359,14 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "slice",
-                                    },
-                                    definition: IndexedAccess(
-                                        IndexedAccess {
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "slice",
+                                        },
+                                    ),
+                                    definition: ArrayAccess(
+                                        ArrayAccess {
                                             cst_kind: "indexed_access",
                                             collection: Identifier(
                                                 Identifier {
@@ -346,11 +374,11 @@ mod test {
                                                     name: "Ms",
                                                 },
                                             ),
-                                            index: [
-                                                ArraySlice(
-                                                    ArraySlice {
+                                            indices: [
+                                                IndexSlice(
+                                                    IndexSlice {
                                                         cst_kind: "..",
-                                                        name: "..",
+                                                        operator: "..",
                                                     },
                                                 ),
                                             ],
@@ -362,7 +390,7 @@ mod test {
                         ],
                     },
                 )
-            "#]]
+            "#]],
         );
     }
 
@@ -383,10 +411,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "different",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "different",
+                                        },
+                                    ),
                                     definition: InfixOperator(
                                         InfixOperator {
                                             cst_kind: "infix_operator",
@@ -414,10 +444,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "smallerlex",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "smallerlex",
+                                        },
+                                    ),
                                     definition: InfixOperator(
                                         InfixOperator {
                                             cst_kind: "infix_operator",
@@ -445,10 +477,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "and",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "and",
+                                        },
+                                    ),
                                     definition: InfixOperator(
                                         InfixOperator {
                                             cst_kind: "infix_operator",
@@ -476,10 +510,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "equiv",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "equiv",
+                                        },
+                                    ),
                                     definition: InfixOperator(
                                         InfixOperator {
                                             cst_kind: "infix_operator",
@@ -507,10 +543,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "exponent",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "exponent",
+                                        },
+                                    ),
                                     definition: InfixOperator(
                                         InfixOperator {
                                             cst_kind: "infix_operator",
@@ -548,7 +586,7 @@ mod test {
             r#"
             letting negative_ident = -x
             letting negated_bool = !true
-            "#, 
+            "#,
             expect![[r#"
                 EPrimeModel(
                     Model {
@@ -556,10 +594,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "negative_ident",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "negative_ident",
+                                        },
+                                    ),
                                     definition: PrefixOperator(
                                         PrefixOperator {
                                             cst_kind: "prefix_operator",
@@ -581,10 +621,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "negated_bool",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "negated_bool",
+                                        },
+                                    ),
                                     definition: PrefixOperator(
                                         PrefixOperator {
                                             cst_kind: "prefix_operator",
@@ -606,7 +648,7 @@ mod test {
                         ],
                     },
                 )
-            "#]]
+            "#]],
         );
     }
 
@@ -621,10 +663,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "expr",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "expr",
+                                        },
+                                    ),
                                     definition: Quantification(
                                         Quantification {
                                             cst_kind: "quantification",
@@ -648,24 +692,24 @@ mod test {
                                                     IntegerDomain {
                                                         cst_kind: "integer_domain",
                                                         range_members: [
-                                                            RangeLiteral(
-                                                                RangeLiteral {
-                                                                    cst_kind: "range_literal",
-                                                                    min: Some(
-                                                                        IntegerLiteral(
-                                                                            IntegerLiteral {
-                                                                                cst_kind: "integer_literal",
-                                                                                value: 1,
-                                                                            },
-                                                                        ),
+                                                            InfixOperator(
+                                                                InfixOperator {
+                                                                    cst_kind: "infix_operator",
+                                                                    operator: Operator {
+                                                                        cst_kind: "..",
+                                                                        name: "..",
+                                                                    },
+                                                                    left: IntegerLiteral(
+                                                                        IntegerLiteral {
+                                                                            cst_kind: "integer_literal",
+                                                                            value: 1,
+                                                                        },
                                                                     ),
-                                                                    max: Some(
-                                                                        IntegerLiteral(
-                                                                            IntegerLiteral {
-                                                                                cst_kind: "integer_literal",
-                                                                                value: 3,
-                                                                            },
-                                                                        ),
+                                                                    right: IntegerLiteral(
+                                                                        IntegerLiteral {
+                                                                            cst_kind: "integer_literal",
+                                                                            value: 3,
+                                                                        },
                                                                     ),
                                                                 },
                                                             ),
@@ -680,8 +724,8 @@ mod test {
                                                         cst_kind: "=",
                                                         name: "=",
                                                     },
-                                                    left: IndexedAccess(
-                                                        IndexedAccess {
+                                                    left: ArrayAccess(
+                                                        ArrayAccess {
                                                             cst_kind: "indexed_access",
                                                             collection: Identifier(
                                                                 Identifier {
@@ -689,7 +733,7 @@ mod test {
                                                                     name: "x",
                                                                 },
                                                             ),
-                                                            index: [
+                                                            indices: [
                                                                 Expression(
                                                                     Identifier(
                                                                         Identifier {
@@ -717,7 +761,7 @@ mod test {
                         ],
                     },
                 )
-            "#]]
+            "#]],
         );
     }
 
@@ -732,10 +776,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "indexed",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "indexed",
+                                        },
+                                    ),
                                     definition: MatrixComprehension(
                                         MatrixComprehension {
                                             cst_kind: "matrix_comprehension",
@@ -773,24 +819,24 @@ mod test {
                                                         IntegerDomain {
                                                             cst_kind: "integer_domain",
                                                             range_members: [
-                                                                RangeLiteral(
-                                                                    RangeLiteral {
-                                                                        cst_kind: "range_literal",
-                                                                        min: Some(
-                                                                            IntegerLiteral(
-                                                                                IntegerLiteral {
-                                                                                    cst_kind: "integer_literal",
-                                                                                    value: 1,
-                                                                                },
-                                                                            ),
+                                                                InfixOperator(
+                                                                    InfixOperator {
+                                                                        cst_kind: "infix_operator",
+                                                                        operator: Operator {
+                                                                            cst_kind: "..",
+                                                                            name: "..",
+                                                                        },
+                                                                        left: IntegerLiteral(
+                                                                            IntegerLiteral {
+                                                                                cst_kind: "integer_literal",
+                                                                                value: 1,
+                                                                            },
                                                                         ),
-                                                                        max: Some(
-                                                                            IntegerLiteral(
-                                                                                IntegerLiteral {
-                                                                                    cst_kind: "integer_literal",
-                                                                                    value: 3,
-                                                                                },
-                                                                            ),
+                                                                        right: IntegerLiteral(
+                                                                            IntegerLiteral {
+                                                                                cst_kind: "integer_literal",
+                                                                                value: 3,
+                                                                            },
                                                                         ),
                                                                     },
                                                                 ),
@@ -810,24 +856,24 @@ mod test {
                                                         IntegerDomain {
                                                             cst_kind: "integer_domain",
                                                             range_members: [
-                                                                RangeLiteral(
-                                                                    RangeLiteral {
-                                                                        cst_kind: "range_literal",
-                                                                        min: Some(
-                                                                            IntegerLiteral(
-                                                                                IntegerLiteral {
-                                                                                    cst_kind: "integer_literal",
-                                                                                    value: 1,
-                                                                                },
-                                                                            ),
+                                                                InfixOperator(
+                                                                    InfixOperator {
+                                                                        cst_kind: "infix_operator",
+                                                                        operator: Operator {
+                                                                            cst_kind: "..",
+                                                                            name: "..",
+                                                                        },
+                                                                        left: IntegerLiteral(
+                                                                            IntegerLiteral {
+                                                                                cst_kind: "integer_literal",
+                                                                                value: 1,
+                                                                            },
                                                                         ),
-                                                                        max: Some(
-                                                                            IntegerLiteral(
-                                                                                IntegerLiteral {
-                                                                                    cst_kind: "integer_literal",
-                                                                                    value: 3,
-                                                                                },
-                                                                            ),
+                                                                        right: IntegerLiteral(
+                                                                            IntegerLiteral {
+                                                                                cst_kind: "integer_literal",
+                                                                                value: 3,
+                                                                            },
                                                                         ),
                                                                     },
                                                                 ),
@@ -864,18 +910,19 @@ mod test {
                                                     IntegerDomain {
                                                         cst_kind: "integer_domain",
                                                         range_members: [
-                                                            RangeLiteral(
-                                                                RangeLiteral {
-                                                                    cst_kind: "range_literal",
-                                                                    min: Some(
-                                                                        IntegerLiteral(
-                                                                            IntegerLiteral {
-                                                                                cst_kind: "integer_literal",
-                                                                                value: 7,
-                                                                            },
-                                                                        ),
+                                                            PostfixOperator(
+                                                                PostfixOperator {
+                                                                    cst_kind: "postfix_operator",
+                                                                    operator: Operator {
+                                                                        cst_kind: "..",
+                                                                        name: "..",
+                                                                    },
+                                                                    operand: IntegerLiteral(
+                                                                        IntegerLiteral {
+                                                                            cst_kind: "integer_literal",
+                                                                            value: 7,
+                                                                        },
                                                                     ),
-                                                                    max: None,
                                                                 },
                                                             ),
                                                         ],
@@ -890,7 +937,7 @@ mod test {
                         ],
                     },
                 )
-            "#]]
+            "#]],
         );
     }
 
@@ -905,10 +952,12 @@ mod test {
                             ConstDefinition(
                                 ConstDefinition {
                                     cst_kind: "const_def",
-                                    name: Identifier {
-                                        cst_kind: "identifier",
-                                        name: "absolute",
-                                    },
+                                    name: Identifier(
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "absolute",
+                                        },
+                                    ),
                                     definition: AbsoluteOperator(
                                         AbsoluteOperator {
                                             cst_kind: "absolute_operator",
@@ -926,7 +975,7 @@ mod test {
                         ],
                     },
                 )
-            "#]]
+            "#]],
         );
     }
 }

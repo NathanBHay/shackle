@@ -18,24 +18,3 @@ pub mod db;
 // AST representations for different modelling languages
 pub mod eprime;
 pub mod minizinc;
-
-use self::{ast::ConstraintModel, eprime::EPrimeModel, minizinc::MznModel, cst::Cst};
-
-/// Enum 'Or Type' for 
-#[derive(PartialEq, Eq, Default)]
-pub enum SyntaxModel {
-    #[default]
-    /// Generate New MiniZinc Model for EPrime
-    MznModel,
-    /// Generate New Constraint Model for EPrime
-    EPrimeModel,
-}
-impl SyntaxModel {
-    /// Generate New Constraint Model for different modelling languages
-    fn new(&self, cst: Cst) -> ConstraintModel {
-        match self {
-            Self::MznModel => ConstraintModel::MznModel(MznModel::new(cst)),
-            Self::EPrimeModel => ConstraintModel::EPrimeModel(EPrimeModel::new(cst)),
-        }
-    }
-}
