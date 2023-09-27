@@ -1,7 +1,9 @@
 //! AST representation of items
 
-use super::{
-	helpers::*, Anonymous, AstNode, Children, Expression, Identifier, Pattern, StringLiteral, Type,
+use super::{Anonymous, Children, Expression, Identifier, Pattern, StringLiteral, Type};
+use crate::syntax::ast::{
+	ast_enum, ast_node, child_with_field_name, children_with_field_name,
+	optional_child_with_field_name, AstNode,
 };
 
 ast_enum!(
@@ -459,7 +461,7 @@ impl TypeAlias {
 
 #[cfg(test)]
 mod test {
-	use crate::syntax::ast::helpers::test::*;
+	use crate::syntax::ast::test::*;
 	use expect_test::expect;
 
 	#[test]
@@ -467,6 +469,7 @@ mod test {
 		check_ast(
 			r#"include "foo.mzn";"#,
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Include(
@@ -479,7 +482,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -489,6 +493,7 @@ mod test {
 		check_ast(
 			"int: x = 3;",
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Declaration(
@@ -530,7 +535,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -540,6 +546,8 @@ mod test {
 		check_ast(
 			"enum Foo = {A, B, C};",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Enumeration(
@@ -582,7 +590,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -592,6 +601,8 @@ mod test {
 		check_ast(
 			"x = 1;",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Assignment(
@@ -616,7 +627,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -626,6 +638,8 @@ mod test {
 		check_ast(
 			"constraint x > 1;",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Constraint(
@@ -660,7 +674,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -670,6 +685,8 @@ mod test {
 		check_ast(
 			"solve minimize x;",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Solve(
@@ -689,7 +706,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -699,6 +717,8 @@ mod test {
 		check_ast(
 			r#"output ["foo"];"#,
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Output(
@@ -725,7 +745,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -735,6 +756,8 @@ mod test {
 		check_ast(
 			"function int: foo(int: x) = x + 1;",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             Function(
@@ -821,7 +844,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -831,6 +855,8 @@ mod test {
 		check_ast(
 			"type Foo = set of int",
 			expect!([r#"
+MznModel(
+MznModel(
     Model {
         items: [
             TypeAlias(
@@ -867,7 +893,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}

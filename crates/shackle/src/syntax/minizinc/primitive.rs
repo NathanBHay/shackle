@@ -1,12 +1,6 @@
 //! AST representation of primitive values
 
-use std::num::IntErrorKind;
-use std::num::ParseFloatError;
-use std::num::ParseIntError;
-
-use super::AstNode;
-
-use super::helpers::*;
+use crate::syntax::ast::{ast_node, decode_string, AstNode};
 
 ast_node!(
 	/// Integer literal
@@ -227,7 +221,8 @@ pub fn parse_float_literal(text: &str) -> Result<f64, FloatParsingError> {
 
 #[cfg(test)]
 mod test {
-	use crate::syntax::ast::{helpers::test::*, FloatParsingError};
+	use crate::syntax::ast::test::*;
+>>>>>>> HIR-Progress:crates/shackle/src/syntax/minizinc/primitive.rs
 	use expect_test::expect;
 
 	use super::parse_float_literal;
@@ -278,18 +273,27 @@ mod test {
 		check_ast(
 			"x = 1;",
 			expect!([r#"
-    Model {
-        items: [
-            Assignment(
-                Assignment {
-                    cst_kind: "assignment",
-                    assignee: Identifier(
-                        UnquotedIdentifier(
-                            UnquotedIdentifier {
-                                cst_kind: "identifier",
-                                name: "x",
+    MznModel(
+        Model {
+            items: [
+                Assignment(
+                    Assignment {
+                        cst_kind: "assignment",
+                        assignee: Identifier(
+                            UnquotedIdentifier(
+                                UnquotedIdentifier {
+                                    cst_kind: "identifier",
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        definition: IntegerLiteral(
+                            IntegerLiteral {
+                                cst_kind: "integer_literal",
+                                value: 1,
                             },
                         ),
+<<<<<<< HEAD:crates/shackle/src/syntax/ast/primitive.rs
                     ),
                     definition: IntegerLiteral(
                         IntegerLiteral {
@@ -303,6 +307,13 @@ mod test {
             ),
         ],
     }
+=======
+                    },
+                ),
+            ],
+        },
+    )
+>>>>>>> HIR-Progress:crates/shackle/src/syntax/minizinc/primitive.rs
 "#]),
 		);
 	}
@@ -312,6 +323,7 @@ mod test {
 		check_ast(
 			"x = 1.2;",
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Assignment(
@@ -336,7 +348,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -346,6 +359,7 @@ mod test {
 		check_ast(
 			r#"x = "foo";"#,
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Assignment(
@@ -368,7 +382,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -378,6 +393,7 @@ mod test {
 		check_ast(
 			"x = <>;",
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Assignment(
@@ -399,7 +415,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}
@@ -409,6 +426,7 @@ mod test {
 		check_ast(
 			r#"x = infinity;"#,
 			expect!([r#"
+MznModel(
     Model {
         items: [
             Assignment(
@@ -430,7 +448,8 @@ mod test {
                 },
             ),
         ],
-    }
+    },
+)
 "#]),
 		);
 	}

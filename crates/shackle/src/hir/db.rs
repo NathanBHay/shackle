@@ -12,8 +12,9 @@ use crate::constants::IdentifierRegistry;
 use crate::db::{CompilerSettings, FileReader, Interner, Upcast};
 use crate::diagnostics::{Diagnostics, IncludeError, MultipleErrors};
 use crate::file::{FileRef, ModelRef};
-use crate::syntax::ast::{self, AstNode};
+use crate::syntax::ast::{AstNode, ConstraintModel};
 use crate::syntax::db::SourceParser;
+use crate::syntax::minizinc;
 use crate::ty::{EnumRef, Ty};
 use crate::{Error, Result, Warning};
 
@@ -292,7 +293,11 @@ fn resolve_includes(db: &dyn Hir) -> Result<Arc<Vec<ModelRef>>> {
 			seen.insert(path);
 		}
 		let model = match db.ast(*file) {
-			Ok(m) => m,
+			Ok(ConstraintModel::MznModel(m)) => m,
+			Ok(ConstraintModel::EPrimeModel(_)) => {
+				models.push(file);
+				continue;
+			}
 			Err(e) => {
 				errors.push(e);
 				continue;
@@ -300,7 +305,7 @@ fn resolve_includes(db: &dyn Hir) -> Result<Arc<Vec<ModelRef>>> {
 		};
 		models.push(file);
 		for item in model.items() {
-			if let ast::Item::Include(i) = item {
+			if let minizinc::Item::Include(i) = item {
 				let value = i.file().value();
 				let included = Path::new(&value);
 
@@ -361,9 +366,11 @@ fn enumeration_names(db: &dyn Hir) -> Arc<HashSet<Identifier>> {
 	let models = db.resolve_includes().unwrap();
 	for model in models.iter() {
 		let ast = db.ast(**model).unwrap();
-		for item in ast.items() {
-			if let ast::Item::Enumeration(e) = item {
-				result.insert(Identifier::new(e.id().name(), db));
+		if let ConstraintModel::MznModel(ast) = ast {
+			for item in ast.items() {
+				if let minizinc::Item::Enumeration(e) = item {
+					result.insert(Identifier::new(e.id().name(), db));
+				}
 			}
 		}
 	}

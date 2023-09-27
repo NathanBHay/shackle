@@ -13,12 +13,13 @@ const PREC = {
 	intersect: 2,
 	additive: 1,
 	union: 1,
-	comparative: 0,
+	range: 0, // Not in the language specification
 	set_in: 0,
-	conjunction: -1,
-	disjunction: -2,
+	comparative: -1,
+	conjunction: -2,
+	disjunction: -3,
 	implication: -4,
-	equivalence: -4,
+	equivalence: -5,
 	quantifiers: -10,
 }
 
@@ -46,20 +47,23 @@ module.exports = grammar({
 			seq(
 				// Note: this is not optional in the language specification, but this
 				// makes the parser a bit more flexible
-				optional($.lang_version),
+				optional(field("lang_version", $.lang_version)),
 				// Note: some of these items must be in a particular order in the
 				// language specification, but this makes the parser a bit more
 				// flexible
 				repeat(
-					choice(
-						$.param_decl,
-						$.const_def,
-						$.domain_alias,
-						$.decision_decl,
-						$.objective,
-						$.branching,
-						$.heuristic,
-						$.constraint
+					field(
+						"item",
+						choice(
+							$.param_decl,
+							$.const_def,
+							$.domain_alias,
+							$.decision_decl,
+							$.objective,
+							$.branching,
+							$.heuristic,
+							$.constraint
+						)
 					)
 				)
 			),
@@ -86,10 +90,7 @@ module.exports = grammar({
 				"letting",
 				field("name", $.identifier),
 				optional(seq(":", field("domain", $._domain))),
-				choice (
-					"=",
-					"be"
-				),
+				choice("=", "be"),
 				field("definition", $._expression)
 			),
 
@@ -113,29 +114,21 @@ module.exports = grammar({
 		objective: ($) =>
 			seq(
 				field("strategy", choice("maximising", "minimising")),
-				field("expression", $._expression)
+				field("objective_expr", $._expression)
 			),
 
 		branching: ($) =>
 			seq(
 				"branching",
 				"on",
-				"[",
-				sepBy(",", field("expression", $._expression)),
-				"]"
+				field("branching_array", $.matrix_literal),
 			),
 
 		constraint: ($) =>
 			seq("such", "that", sepBy1(",", field("expression", $._expression))),
 
 		heuristic: ($) =>
-			seq("heuristic", optional(field("name", $.heuristicType))),
-		heuristicType : ($) => choice(
-			"static",
-			"sdf",
-			"srf",
-			"conflict"
-		),
+			seq("heuristic", optional(field("heuristic", choice("static", "sdf", "srf", "conflict")))),
 
 		_expression: ($) =>
 			choice(
@@ -144,10 +137,10 @@ module.exports = grammar({
 				$.identifier,
 				$.indexed_access,
 				$.infix_operator,
-				$.set_in,
 				$.integer_literal,
 				$.matrix_literal,
 				$.prefix_operator,
+				$.postfix_operator,
 				$.quantification,
 				$.matrix_comprehension,
 				$.absolute_operator,
@@ -217,6 +210,8 @@ module.exports = grammar({
 				[prec.left, PREC.equivalence, "<->"],
 				[prec.left, PREC.implication, "=>"],
 				[prec.left, PREC.equivalence, "<=>"],
+				[prec.left, PREC.set_in, "in"],
+				[prec.left, PREC.range, ".."],
 			]
 
 			return choice(
@@ -233,41 +228,37 @@ module.exports = grammar({
 			)
 		},
 
-		set_in: ($) =>
-			prec.left(
-				PREC.set_in,
-				seq(
-					field("left", $._expression),
-					field("operator", "in"),
-					field("right", $._expression)
-				)
-			),
-		
 		absolute_operator: ($) =>
-			prec(
-				PREC.absolute,
-				seq(
-					"|",
-					field("operand", $._expression),
-					"|"
-				)
-			),
+			prec(PREC.absolute, seq("|", field("operand", $._expression), "|")),
 
 		prefix_operator: ($) => {
 			const table = [
 				[PREC.not, "!"],
-				[PREC.negation, "-"],
+				[PREC.negation, "-"]
 			]
 
 			return choice(
 				...table.map(([precedence, operator]) =>
-					prec(
+					prec.left(
 						precedence,
 						seq(field("operator", operator), field("operand", $._expression))
 					)
+				),
+				prec.left(
+					PREC.range,
+					seq(field("operator", ".."), field("operand", $._expression))
 				)
 			)
 		},
+
+		postfix_operator: ($) => 
+			prec.right(
+				PREC.range,
+				seq(
+					field("operand", $._expression),
+					field("operator", "..")
+				)
+			),
 
 		_domain: ($) => choice($._base_domain, $.matrix_domain),
 
@@ -319,7 +310,7 @@ module.exports = grammar({
 				optional(
 					seq(
 						"(",
-						sepBy(",", field("member", choice($._expression, $.range_literal))),
+						sepBy(",", field("member", $._expression)),
 						")"
 					)
 				)
@@ -333,12 +324,6 @@ module.exports = grammar({
 				"]"
 			),
 
-		range_literal: ($) =>
-			choice(
-				seq(field("min", $._expression), ".."),
-				seq("..", field("max", $._expression)),
-				seq(field("min", $._expression), "..", field("max", $._expression))
-			),
 		boolean_literal: ($) => choice("true", "false"),
 		integer_literal: ($) => /\d+/,
 

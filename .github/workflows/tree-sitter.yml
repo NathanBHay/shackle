@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        parser: ["eprime", "minizinc"]
+        parser: ["eprime", "minizinc", "ampl"]
 
     steps:
       - uses: actions/checkout@v3

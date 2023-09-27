@@ -9,6 +9,12 @@
 //!
 //! The AST is then lowered into HIR, which is the main representation used by the compiler.
 //!
+
+
 pub mod ast;
 pub mod cst;
 pub mod db;
+
+// AST representations for different modelling languages
+pub mod eprime;
+pub mod minizinc;

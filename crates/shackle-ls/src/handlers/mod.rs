@@ -29,7 +29,7 @@ pub mod test {
 	use shackle::{
 		db::{CompilerDatabase, FileReader, Inputs},
 		diagnostics::FileError,
-		file::{FileHandler, InputFile},
+		file::{FileHandler, InputFile, InputLang},
 	};
 	use std::{
 		ops::Deref,
@@ -106,6 +106,7 @@ pub mod test {
 		db.db.set_ignore_stdlib(no_stdlib);
 		db.db.set_input_files(Arc::new(vec![InputFile::Path(
 			PathBuf::from_str("test.mzn").unwrap(),
+			InputLang::MiniZinc,
 		)]));
 		H::prepare(&mut db, params).and_then(|t| H::execute(&db, t))
 	}
