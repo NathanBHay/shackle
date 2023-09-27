@@ -114,16 +114,14 @@ module.exports = grammar({
 		objective: ($) =>
 			seq(
 				field("strategy", choice("maximising", "minimising")),
-				field("expression", $._expression)
+				field("objective_expr", $._expression)
 			),
 
 		branching: ($) =>
 			seq(
 				"branching",
 				"on",
-				"[",
-				sepBy(",", field("expression", $._expression)),
-				"]"
+				field("branching_array", $.matrix_literal),
 			),
 
 		constraint: ($) =>
