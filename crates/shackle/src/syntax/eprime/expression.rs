@@ -33,7 +33,7 @@ ast_node!(
 
 impl Call {
     /// Get the name of this call
-    pub fn function(&self) -> Expression {
+    pub fn function(&self) -> Identifier {
         child_with_field_name(self, "function")
     }
 
