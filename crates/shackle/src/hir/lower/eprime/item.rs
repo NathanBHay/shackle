@@ -8,6 +8,7 @@ use crate::hir::*;
 use crate::syntax::eprime;
 use crate::Error;
 
+/// Collects AST items into an HIR model
 pub struct ItemCollector<'a> {
 	db: &'a dyn Hir,
 	identifiers: &'a IdentifierRegistry,
@@ -137,7 +138,7 @@ impl ItemCollector<'_> {
 	fn collect_declarations<I: Iterator<Item = eprime::Identifier>>(&mut self, names: I, domain: eprime::Domain) {
 		for name in names {
 			let mut ctx = ExpressionCollector::new(self.db, &mut self.diagnostics);
-			let declared_type = ctx.collect_domain(domain.clone(), VarType::Var);
+			let declared_type = ctx.collect_domain(domain.clone());
 			let pattern = ctx.alloc_ident_pattern(Origin::new(&name), name.clone());
 			let (data, sm) = ctx.finish();
 			let index = self.model.declarations.insert(Item::new(
@@ -187,7 +188,7 @@ impl ItemCollector<'_> {
 		let origin = Origin::new(&d);
 		let mut ctx = ExpressionCollector::new(self.db, &mut self.diagnostics);
 		let name = ctx.alloc_ident_pattern(origin.clone(), d.name());
-		let aliased_type = ctx.collect_domain(d.definition(), VarType::Par);
+		let aliased_type = ctx.collect_domain(d.definition());
 		let (data, source_map) = ctx.finish();
 		let index = self.model.type_aliases.insert(Item::new(
 			TypeAlias {

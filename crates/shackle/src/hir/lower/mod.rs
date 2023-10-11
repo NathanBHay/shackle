@@ -3,6 +3,7 @@
 
 pub mod minizinc;
 pub mod eprime;
+#[cfg(test)]
 pub mod test;
 use std::sync::Arc;
 
