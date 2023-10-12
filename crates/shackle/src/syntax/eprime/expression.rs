@@ -1,6 +1,6 @@
 //! AST representation of Eprime Expressions
 
-use super::{BooleanLiteral, Domain, IntegerLiteral, MatrixLiteral};
+use super::{BooleanLiteral, Domain, IntegerLiteral, StringLiteral, MatrixLiteral};
 
 use crate::syntax::ast::{
     ast_enum, ast_node, child_with_field_name, children_with_field_name,
@@ -11,12 +11,13 @@ ast_enum!(
     /// Expression
     Expression,
     "boolean_literal" => BooleanLiteral,
+    "integer_literal" => IntegerLiteral,
+    "string_literal" => StringLiteral,
+    "matrix_literal" => MatrixLiteral,
     "call" => Call,
     "identifier" => Identifier,
     "indexed_access" => ArrayAccess,
     "infix_operator" => InfixOperator,
-    "integer_literal" => IntegerLiteral,
-    "matrix_literal" => MatrixLiteral,
     "prefix_operator" => PrefixOperator,
     "postfix_operator" => PostfixOperator,
     "quantification" => Quantification,
@@ -281,12 +282,10 @@ mod test {
                                     definition: Call(
                                         Call {
                                             cst_kind: "call",
-                                            function: Identifier(
-                                                Identifier {
-                                                    cst_kind: "identifier",
-                                                    name: "toVec",
-                                                },
-                                            ),
+                                            function: Identifier {
+                                                cst_kind: "identifier",
+                                                name: "toVec",
+                                            },
                                             arguments: [
                                                 Identifier(
                                                     Identifier {

@@ -87,91 +87,92 @@ mod test {
     #[test]
     fn test_domain_operation() {
         check_ast_eprime(
-            "given a: int(1..2) union int(3..4)", 
+        "given a: int(1..2) union int(3..4)", 
         expect![r#"
-        EPrimeModel(
-    Model {
-        items: [
-            ParamDeclaration(
-                ParamDeclaration {
-                    cst_kind: "param_decl",
-                    names: [
-                        Identifier {
-                            cst_kind: "identifier",
-                            name: "a",
-                        },
-                    ],
-                    domain: DomainOperation(
-                        DomainOperation {
-                            cst_kind: "domain_operation",
-                            operator: Operator {
-                                cst_kind: "union",
-                                name: "union",
-                            },
-                            left: IntegerDomain(
-                                IntegerDomain {
-                                    cst_kind: "integer_domain",
-                                    domain: [
-                                        InfixOperator(
-                                            InfixOperator {
-                                                cst_kind: "infix_operator",
-                                                operator: Operator {
-                                                    cst_kind: "..",
-                                                    name: "..",
-                                                },
-                                                left: IntegerLiteral(
-                                                    IntegerLiteral {
-                                                        cst_kind: "integer_literal",
-                                                        value: 1,
-                                                    },
-                                                ),
-                                                right: IntegerLiteral(
-                                                    IntegerLiteral {
-                                                        cst_kind: "integer_literal",
-                                                        value: 2,
-                                                    },
-                                                ),
-                                            },
-                                        ),
+                EPrimeModel(
+                    Model {
+                        items: [
+                            ParamDeclaration(
+                                ParamDeclaration {
+                                    cst_kind: "param_decl",
+                                    names: [
+                                        Identifier {
+                                            cst_kind: "identifier",
+                                            name: "a",
+                                        },
                                     ],
+                                    domain: DomainOperation(
+                                        DomainOperation {
+                                            cst_kind: "domain_operation",
+                                            operator: Operator {
+                                                cst_kind: "union",
+                                                name: "union",
+                                            },
+                                            left: IntegerDomain(
+                                                IntegerDomain {
+                                                    cst_kind: "integer_domain",
+                                                    domain: [
+                                                        InfixOperator(
+                                                            InfixOperator {
+                                                                cst_kind: "infix_operator",
+                                                                operator: Operator {
+                                                                    cst_kind: "..",
+                                                                    name: "..",
+                                                                },
+                                                                left: IntegerLiteral(
+                                                                    IntegerLiteral {
+                                                                        cst_kind: "integer_literal",
+                                                                        value: 1,
+                                                                    },
+                                                                ),
+                                                                right: IntegerLiteral(
+                                                                    IntegerLiteral {
+                                                                        cst_kind: "integer_literal",
+                                                                        value: 2,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                            right: IntegerDomain(
+                                                IntegerDomain {
+                                                    cst_kind: "integer_domain",
+                                                    domain: [
+                                                        InfixOperator(
+                                                            InfixOperator {
+                                                                cst_kind: "infix_operator",
+                                                                operator: Operator {
+                                                                    cst_kind: "..",
+                                                                    name: "..",
+                                                                },
+                                                                left: IntegerLiteral(
+                                                                    IntegerLiteral {
+                                                                        cst_kind: "integer_literal",
+                                                                        value: 3,
+                                                                    },
+                                                                ),
+                                                                right: IntegerLiteral(
+                                                                    IntegerLiteral {
+                                                                        cst_kind: "integer_literal",
+                                                                        value: 4,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    wheres: None,
                                 },
                             ),
-                            right: IntegerDomain(
-                                IntegerDomain {
-                                    cst_kind: "integer_domain",
-                                    domain: [
-                                        InfixOperator(
-                                            InfixOperator {
-                                                cst_kind: "infix_operator",
-                                                operator: Operator {
-                                                    cst_kind: "..",
-                                                    name: "..",
-                                                },
-                                                left: IntegerLiteral(
-                                                    IntegerLiteral {
-                                                        cst_kind: "integer_literal",
-                                                        value: 3,
-                                                    },
-                                                ),
-                                                right: IntegerLiteral(
-                                                    IntegerLiteral {
-                                                        cst_kind: "integer_literal",
-                                                        value: 4,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                },
-                            ),
-                        },
-                    ),
-                    wheres: [],
-                },
-            ),
-        ],
-    },
-)"#])
+                        ],
+                    },
+                )
+        "#])
     }
 
     #[test]
@@ -223,7 +224,7 @@ mod test {
                                             ],
                                         },
                                     ),
-                                    wheres: [],
+                                    wheres: None,
                                 },
                             ),
                             ParamDeclaration(
@@ -296,7 +297,7 @@ mod test {
                                             ],
                                         },
                                     ),
-                                    wheres: [],
+                                    wheres: None,
                                 },
                             ),
                             ParamDeclaration(
@@ -314,7 +315,7 @@ mod test {
                                             domain: [],
                                         },
                                     ),
-                                    wheres: [],
+                                    wheres: None,
                                 },
                             ),
                         ],
@@ -349,7 +350,7 @@ mod test {
                                             cst_kind: "boolean_domain",
                                         },
                                     ),
-                                    wheres: [],
+                                    wheres: None,
                                 },
                             ),
                             ParamDeclaration(
@@ -370,7 +371,7 @@ mod test {
                                             cst_kind: "boolean_domain",
                                         },
                                     ),
-                                    wheres: [],
+                                    wheres: None,
                                 },
                             ),
                         ],
@@ -437,7 +438,7 @@ mod test {
                                             ),
                                         },
                                     ),
-                                    wheres: [],
+                                    wheres: None,
                                 },
                             ),
                         ],

@@ -17,6 +17,7 @@ ast_enum!(
     "branching" => Branching,
     "heuristic" => Heuristic,
     "constraint" => Constraint,
+    "output" => Output,
 );
 
 ast_node!(
@@ -205,6 +206,19 @@ impl Constraint {
     }
 }
 
+ast_node!(
+    /// Output
+    Output,
+    expression,
+);
+
+impl Output {
+    /// Get output expressions
+    pub fn expression(&self) -> Expression {
+        child_with_field_name(self, "expression")
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::syntax::ast::test::check_ast_eprime;
@@ -313,7 +327,7 @@ mod test {
                                             ],
                                         },
                                     ),
-                                    wheres: [],
+                                    wheres: None,
                                 },
                             ),
                             ParamDeclaration(
@@ -353,7 +367,7 @@ mod test {
                                             ],
                                         },
                                     ),
-                                    wheres: [
+                                    wheres: Some(
                                         InfixOperator(
                                             InfixOperator {
                                                 cst_kind: "infix_operator",
@@ -375,7 +389,7 @@ mod test {
                                                 ),
                                             },
                                         ),
-                                    ],
+                                    ),
                                 },
                             ),
                         ],
@@ -617,6 +631,40 @@ mod test {
                                             },
                                         ),
                                     ],
+                                },
+                            ),
+                        ],
+                    },
+                )
+            "#]]
+        )
+    }
+
+    #[test]
+    fn test_output() {
+        check_ast_eprime(
+            r#"output["foo"]"#,
+            expect![[r#"
+                EPrimeModel(
+                    Model {
+                        items: [
+                            Output(
+                                Output {
+                                    cst_kind: "output",
+                                    expression: MatrixLiteral(
+                                        MatrixLiteral {
+                                            cst_kind: "matrix_literal",
+                                            members: [
+                                                StringLiteral(
+                                                    StringLiteral {
+                                                        cst_kind: "string_literal",
+                                                        value: "foo",
+                                                    },
+                                                ),
+                                            ],
+                                            index: None,
+                                        },
+                                    ),
                                 },
                             ),
                         ],
