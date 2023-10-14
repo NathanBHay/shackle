@@ -142,6 +142,7 @@ module.exports = grammar({
 				$.boolean_literal,
 				$.integer_literal,
 				$.string_literal,
+				$.infinity,
 				$.matrix_literal,
 				$.call,
 				$.identifier,
@@ -337,6 +338,7 @@ module.exports = grammar({
 
 		boolean_literal: (_) => choice("true", "false"),
 		integer_literal: (_) => /\d+/,
+		infinity: (_) => choice("infinity", "∞"),
 
 		string_literal: ($) => seq('"', optional($._string_content), '"'),
 		_string_content: ($) =>
