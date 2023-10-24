@@ -24,6 +24,7 @@ ast_enum!(
     "quantification" => Quantification,
     "matrix_comprehension" => MatrixComprehension,
     "absolute_operator" => AbsoluteOperator,
+    "set_constructor" => SetConstructor,
 	"parenthesised_expression" => "expression" // Turn parenthesised_expression into Expression node
 );
 
@@ -255,6 +256,31 @@ impl AbsoluteOperator {
     /// Get the operand of this absolute operator
     pub fn operand(&self) -> Expression {
         child_with_field_name(self, "operand")
+    }
+}
+
+ast_node!(
+    /// Infix Operator
+    SetConstructor,
+    operator,
+    left,
+    right
+);
+
+impl SetConstructor {
+    /// Get the operator of this set operator
+    pub fn operator(&self) -> Operator {
+        child_with_field_name(self, "operator")
+    }
+
+    /// Get the left expression of this set operator
+    pub fn left(&self) -> Expression {
+        child_with_field_name(self, "left")
+    }
+
+    /// Get the right expression of this set operator
+    pub fn right(&self) -> Expression {
+        child_with_field_name(self, "right")
     }
 }
 
@@ -693,9 +719,9 @@ mod test {
                                                     IntegerDomain {
                                                         cst_kind: "integer_domain",
                                                         domain: [
-                                                            InfixOperator(
-                                                                InfixOperator {
-                                                                    cst_kind: "infix_operator",
+                                                            SetConstructor(
+                                                                SetConstructor {
+                                                                    cst_kind: "set_constructor",
                                                                     operator: Operator {
                                                                         cst_kind: "..",
                                                                         name: "..",
@@ -820,9 +846,9 @@ mod test {
                                                         IntegerDomain {
                                                             cst_kind: "integer_domain",
                                                             domain: [
-                                                                InfixOperator(
-                                                                    InfixOperator {
-                                                                        cst_kind: "infix_operator",
+                                                                SetConstructor(
+                                                                    SetConstructor {
+                                                                        cst_kind: "set_constructor",
                                                                         operator: Operator {
                                                                             cst_kind: "..",
                                                                             name: "..",
@@ -857,9 +883,9 @@ mod test {
                                                         IntegerDomain {
                                                             cst_kind: "integer_domain",
                                                             domain: [
-                                                                InfixOperator(
-                                                                    InfixOperator {
-                                                                        cst_kind: "infix_operator",
+                                                                SetConstructor(
+                                                                    SetConstructor {
+                                                                        cst_kind: "set_constructor",
                                                                         operator: Operator {
                                                                             cst_kind: "..",
                                                                             name: "..",
