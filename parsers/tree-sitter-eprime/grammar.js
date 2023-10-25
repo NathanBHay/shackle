@@ -149,7 +149,8 @@ module.exports = grammar({
 				$.indexed_access,
 				$.infix_operator,
 				$.prefix_operator,
-				$.postfix_operator,
+				$.prefix_set_constructor,
+				$.postfix_set_constructor,
 				$.quantification,
 				$.matrix_comprehension,
 				$.absolute_operator,
@@ -266,20 +267,22 @@ module.exports = grammar({
 						seq(field("operator", operator), field("operand", $._expression))
 					)
 				),
-				prec.left(
-					PREC.range,
-					seq(field("operator", ".."), field("operand", $._expression))
-				)
 			)
 		},
 
-		postfix_operator: ($) => 
+		postfix_set_constructor: ($) => 
 			prec.right(
 				PREC.range,
 				seq(
 					field("operand", $._expression),
 					field("operator", "..")
 				)
+			),
+		
+		prefix_set_constructor: ($) =>
+			prec.left(
+				PREC.range,
+				seq(field("operator", ".."), field("operand", $._expression))
 			),
 
 		_domain: ($) => choice($._base_domain, $.matrix_domain),
