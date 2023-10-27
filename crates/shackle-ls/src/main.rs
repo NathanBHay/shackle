@@ -1,13 +1,13 @@
+use std::error::Error;
+
 use db::LanguageServerDatabase;
+use lsp_server::{Connection, ExtractError, Message};
 use lsp_types::{
 	notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
 	CompletionOptions, HoverProviderCapability, InitializeParams, OneOf, SemanticTokensFullOptions,
 	SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
 	ServerCapabilities, TextDocumentSyncKind,
 };
-use std::error::Error;
-
-use lsp_server::{Connection, ExtractError, Message};
 
 use crate::{
 	dispatch::{DispatchNotification, DispatchRequest},
@@ -40,6 +40,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 		references_provider: Some(OneOf::Left(true)),
 		text_document_sync: Some(TextDocumentSyncKind::FULL.into()),
 		hover_provider: Some(HoverProviderCapability::Simple(true)),
+		rename_provider: Some(OneOf::Left(true)),
 		completion_provider: Some(CompletionOptions {
 			trigger_characters: Some(vec![".".to_owned()]),
 			..Default::default()
@@ -86,6 +87,7 @@ fn main_loop(
 					.on::<ViewPrettyPrintHandler, _, _>()
 					.on::<GotoDefinitionHandler, _, _>()
 					.on::<ReferencesHandler, _, _>()
+					.on::<RenameHandler, _, _>()
 					.on::<HoverHandler, _, _>()
 					.on::<CompletionsHandler, _, _>()
 					.on::<SemanticTokensHandler, _, _>()

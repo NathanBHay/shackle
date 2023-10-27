@@ -2,12 +2,12 @@ use lsp_server::ResponseError;
 use lsp_types::{
 	request::HoverRequest, Hover, HoverContents, HoverParams, LanguageString, MarkedString,
 };
-use shackle::{
+use shackle_compiler::{
 	db::CompilerDatabase,
 	file::ModelRef,
-	hir::{db::Hir, ids::NodeRef},
 	hir::{
-		ids::LocalEntityRef,
+		db::Hir,
+		ids::{LocalEntityRef, NodeRef},
 		source::{find_node, Point},
 	},
 };
@@ -94,9 +94,8 @@ mod test {
 	use expect_test::expect;
 	use lsp_types::Url;
 
-	use crate::handlers::test::test_handler;
-
 	use super::HoverHandler;
+	use crate::handlers::test::test_handler;
 
 	#[test]
 	fn test_hover() {

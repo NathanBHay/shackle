@@ -1,14 +1,11 @@
 use lsp_server::ResponseError;
 use lsp_types::{request::GotoDefinition, GotoDefinitionParams, GotoDefinitionResponse};
-use shackle::{
+use shackle_compiler::{
 	db::CompilerDatabase,
 	file::ModelRef,
 	hir::{
 		db::Hir,
-		ids::{NodeRef, PatternRef},
-	},
-	hir::{
-		ids::LocalEntityRef,
+		ids::{LocalEntityRef, NodeRef, PatternRef},
 		source::{find_node, Point},
 	},
 };
@@ -76,9 +73,8 @@ mod test {
 	use expect_test::expect;
 	use lsp_types::Url;
 
-	use crate::handlers::test::test_handler;
-
 	use super::GotoDefinitionHandler;
+	use crate::handlers::test::test_handler;
 
 	#[test]
 	fn test_goto_definition_1() {

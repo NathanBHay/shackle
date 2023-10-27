@@ -1,9 +1,3 @@
-/*
-Important Notes:
-- The integer domain may need to be modified to differentiate between specific integer domains and ones that require a file.
-
-*/
-
 const PREC = {
 	not: 20,
 	absolute: 20,
@@ -119,23 +113,18 @@ module.exports = grammar({
 			),
 
 		branching: ($) =>
-			seq(
-				"branching",
-				"on",
-				field("branching_array", $.matrix_literal),
-			),
+			seq("branching", "on", field("branching_array", $.matrix_literal)),
 
 		constraint: ($) =>
 			seq("such", "that", sepBy1(",", field("expression", $._expression))),
 
 		heuristic: ($) =>
-			seq("heuristic", optional(field("heuristic", choice("static", "sdf", "srf", "conflict")))),
-
-		output: ($) =>
 			seq(
-				"output",
-				field("expression", $._expression)
+				"heuristic",
+				optional(field("heuristic", choice("static", "sdf", "srf", "conflict")))
 			),
+
+		output: ($) => seq("output", field("expression", $._expression)),
 
 		_expression: ($) =>
 			choice(
@@ -257,7 +246,7 @@ module.exports = grammar({
 		prefix_operator: ($) => {
 			const table = [
 				[PREC.not, "!"],
-				[PREC.negation, "-"]
+				[PREC.negation, "-"],
 			]
 
 			return choice(
@@ -332,13 +321,7 @@ module.exports = grammar({
 		integer_domain: ($) =>
 			seq(
 				"int",
-				optional(
-					seq(
-						"(",
-						sepBy(",", field("member", $._expression)),
-						")"
-					)
-				)
+				optional(seq("(", sepBy(",", field("member", $._expression)), ")"))
 			),
 
 		matrix_literal: ($) =>
@@ -366,7 +349,10 @@ module.exports = grammar({
 				["\\n", "\n"],
 				["\\t", "\t"],
 			]
-			return field("escape", choice(...simpleEscape.map(([e, v]) => alias(e, v))))
+			return field(
+				"escape",
+				choice(...simpleEscape.map(([e, v]) => alias(e, v)))
+			)
 		},
 
 		identifier: (_) => /[A-Za-z][A-Za-z0-9_]*/,

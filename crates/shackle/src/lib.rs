@@ -1,49 +1,54 @@
-//! Shackle library
+//! Shackle user-facing library.
 
 #![warn(missing_docs)]
 #![warn(unused_crate_dependencies, unused_extern_crates)]
 #![warn(variant_size_differences)]
 
-pub mod arena;
-pub mod constants;
-pub mod db;
-pub mod diagnostics;
-pub mod file;
-pub mod hir;
+mod data;
 mod legacy;
-pub mod mir;
-pub mod refmap;
-pub mod syntax;
-pub mod thir;
-pub mod ty;
-pub mod utils;
-
-use db::{CompilerDatabase, Inputs};
-use diagnostics::ShackleError;
-use file::{InputFile, InputLang};
-use serde_json::Map;
+mod value;
 
 use std::{
-	collections::BTreeMap,
-	fmt::{self, Display},
+	ffi::OsStr,
+	fmt::Display,
 	io::Write,
-	ops::Range,
-	path::PathBuf,
+	ops::Deref,
+	path::{Path, PathBuf},
 	sync::Arc,
 	time::Duration,
 };
 
-use crate::{
-	hir::db::Hir,
-	thir::{db::Thir, pretty_print::PrettyPrinter},
+use data::{
+	dzn::{collect_dzn_value, parse_dzn},
+	serde::SerdeFileVisitor,
 };
+// Result type for Shackle operations
+pub use error::{Error, Result};
+use itertools::Itertools;
+use rustc_hash::{FxHashMap, FxHashSet};
+use serde::Deserializer;
+// Export OptType enumeration used in [`Type`]
+pub use shackle_compiler::ty::OptType;
+use shackle_compiler::{
+	db::{CompilerDatabase, Inputs, InternedString, Interner},
+	file::{InputFile, InputLang, SourceFile},
+	hir::db::Hir,
+	syntax::{ast::AstNode, minizinc::Identifier},
+	thir::{self, db::Thir, pretty_print::PrettyPrinter, Declaration},
+	ty::{Ty, TyData},
+};
+use value::EnumInner;
+pub use value::{Enum, Value};
 
-/// Shackle error type
-pub type Error = ShackleError;
-/// Result type for Shackle operations
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+/// Shackle errors
+pub mod error {
+	pub use shackle_compiler::{diagnostics::error::*, Result};
+}
 
-pub use diagnostics::Warning;
+/// Shackle warnings
+pub mod warning {
+	pub use shackle_compiler::diagnostics::warning::*;
+}
 
 /// Structure used to build a shackle model
 pub struct Model {
@@ -53,7 +58,7 @@ pub struct Model {
 impl Model {
 	/// Create a Model from the file at the given path
 	pub fn from_file(path: PathBuf) -> Model {
-		let mut db = db::CompilerDatabase::default();
+		let mut db = CompilerDatabase::default();
 		let l = InputLang::from_extension(path.extension());
 		db.set_input_files(Arc::new(vec![InputFile::Path(path, l)]));
 		Model { db }
@@ -61,7 +66,7 @@ impl Model {
 
 	/// Create a Model from the given string
 	pub fn from_string(m: String, l: InputLang) -> Model {
-		let mut db = db::CompilerDatabase::default();
+		let mut db = CompilerDatabase::default();
 		db.set_input_files(Arc::new(vec![InputFile::String(m, l)]));
 		Model { db }
 	}
@@ -69,20 +74,45 @@ impl Model {
 	/// Check whether a model contains any (non-runtime) errors
 	pub fn check(&self, _slv: &Solver, _data: &[PathBuf], _complete: bool) -> Vec<Error> {
 		// TODO: Check data files
-		self.db.all_errors().iter().cloned().collect()
+		self.db
+			.run_hir_phase()
+			.map(|_| Vec::new())
+			.unwrap_or_else(|e| e.iter().cloned().collect())
 	}
 
 	/// Compile current model into a Program that can be used by the Shackle interpreter
 	pub fn compile(self, slv: &Solver) -> Result<Program> {
 		let errors = self.check(slv, &[], false);
 		if !errors.is_empty() {
-			return Err(ShackleError::try_from(errors).unwrap());
+			return Err(Error::try_from(errors).unwrap());
 		}
-		let prg_model = self.db.final_thir();
+		let ModelIoInterface {
+			input,
+			output,
+			enums,
+		} = ModelIoInterface::new(&self.db);
+		let legacy_enums = enums
+			.iter()
+			.filter_map(|(_, e)| {
+				if e.state.lock().unwrap().deref() == &EnumInner::NoDefinition {
+					Some(e.clone())
+				} else {
+					None
+				}
+			})
+			.collect();
+
+		let prg_model = self.db.final_thir()?;
+
 		Ok(Program {
 			db: self.db,
 			slv: slv.clone(),
 			code: prg_model,
+			input_types: input,
+			input_data: FxHashMap::default(),
+			enum_types: enums,
+			legacy_enums,
+			output_types: output,
 			enable_stats: false,
 			time_limit: None,
 		})
@@ -108,17 +138,27 @@ impl Solver {
 
 /// Structure to capture the result of succesful compilation of a Model object
 pub struct Program {
-	// FIXME: CompilerDatabase should not be part of Program anymore
+	// FIXME: CompilerDatabase should (probably) not be part of Program anymore
 	db: CompilerDatabase,
-	slv: Solver,
 	code: Arc<thir::Model>,
+	slv: Solver,
+
+	// Model instance data
+	input_types: FxHashMap<Arc<str>, Type>,
+	input_data: FxHashMap<Arc<str>, Value>,
+	enum_types: FxHashMap<Arc<str>, Arc<Enum>>,
+
+	// LEGACY: names of the enumerated types that have to be given to the legacy interpreter
+	legacy_enums: Vec<Arc<Enum>>,
+
+	output_types: FxHashMap<Arc<str>, Type>,
 	// run() options
 	enable_stats: bool,
 	time_limit: Option<Duration>,
 }
 
 /// Status of running and solving a Program
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Status {
 	/// No solutions exist
 	Infeasible,
@@ -130,120 +170,195 @@ pub enum Status {
 	AllSolutions,
 	/// No result reached within the given limits
 	Unknown,
-	/// An error occurred
-	Err(ShackleError),
 }
 
-/// Value types that can be part of a Solution
-#[derive(Debug, Clone)]
-pub enum Value {
-	/// Absence of an optional value
-	Absent,
-	/// Boolean
-	Boolean(bool),
-	/// Signed integer
-	Integer(i64),
-	/// Floating point
-	Float(f64),
-	/// String
-	String(String),
-	/// Identifier of a value of an enumerated type
-	// FIXME this should probably have the actual structuring of enumerated types
-	Enum(String),
-	/// An array of values
-	/// All values are of the same type
-	Array(Vec<Range<i64>>, Vec<Value>),
-	/// A set of values
-	/// All values are of the same type and only occur once
-	Set(Vec<Value>),
-	/// A tuple of values
-	Tuple(Vec<Value>),
-	/// A record of values
-	Record(BTreeMap<String, Value>),
+/// An type of the input or output of a Shackle model
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Type {
+	/// Boolean scalar
+	Boolean(OptType),
+	/// Integer scalar
+	Integer(OptType),
+	/// Float scalar
+	Float(OptType),
+	/// Enumerated type scalar
+	Enum(OptType, Arc<Enum>),
+
+	/// String scalar
+	String(OptType),
+	/// Annotation scalar
+	Annotation(OptType),
+
+	/// Array type
+	Array {
+		/// Whether the array is optional
+		opt: OptType,
+		/// Type used for indexing
+		dim: Box<[Type]>,
+		/// Type of the element
+		element: Box<Type>,
+	},
+	/// Set type
+	Set(OptType, Box<Type>),
+	/// Tuple type
+	Tuple(OptType, Arc<[Type]>),
+	/// Record type
+	Record(OptType, Arc<[(Arc<str>, Type)]>),
 }
 
-impl Display for Value {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			Value::Absent => write!(f, "<>"),
-			Value::Boolean(v) => write!(f, "{}", v),
-			Value::Integer(v) => write!(f, "{}", v),
-			Value::Float(v) => write!(f, "{}", v),
-			Value::String(v) => write!(f, "{:?}", v),
-			Value::Enum(v) => write!(f, "{}", v),
-			Value::Array(idx, v) => {
-				let mut ii: Vec<i64> = idx.iter().map(|r| r.start).collect();
-				let incr = |ii: &mut Vec<i64>| {
-					let mut i = ii.len() - 1;
-					ii[i] += 1;
-					while !idx[i].contains(&ii[i]) && i > 0 {
-						ii[i] = idx[i].start;
-						i = i.wrapping_sub(1);
-						ii[i] += 1;
+impl Type {
+	fn from_compiler<S: FnMut(InternedString) -> Arc<str>>(
+		db: &dyn Interner,
+		str_interner: &mut S,
+		type_map: &mut FxHashMap<Ty, Type>,
+		enum_map: &FxHashMap<Arc<str>, Arc<Enum>>,
+		value: Ty,
+	) -> Self {
+		let data = value.lookup(db);
+		match data {
+			TyData::Boolean(_, opt) => Type::Boolean(opt),
+			TyData::Integer(_, opt) => Type::Integer(opt),
+			TyData::Float(_, opt) => Type::Float(opt),
+			TyData::Enum(_, opt, e) => Type::Enum(opt, enum_map[&str_interner(e.name(db))].clone()),
+			TyData::String(opt) => Type::String(opt),
+			TyData::Annotation(opt) => Type::Annotation(opt),
+			TyData::Array { opt, dim, element } => {
+				let elem = Type::from_compiler(db, str_interner, type_map, enum_map, element);
+				let mut index_conv = |nty| -> Type {
+					match nty {
+						TyData::Integer(_, _) => Type::Integer(OptType::NonOpt),
+						TyData::Enum(_, _, e) => {
+							Type::Enum(OptType::NonOpt, enum_map[&str_interner(e.name(db))].clone())
+						}
+						_ => {
+							unreachable!("invalid index set type {:?}", nty)
+						}
 					}
 				};
-				let mut first = true;
-				write!(f, "[")?;
-				for x in v {
-					if !first {
-						write!(f, ", ")?;
+				let ndim = match dim.lookup(db) {
+					TyData::Tuple(OptType::NonOpt, li) => {
+						li.iter().map(|ty| index_conv(ty.lookup(db))).collect()
 					}
-					match &ii[..] {
-						[i] => write!(f, "{i}: "),
-						ii => {
-							write!(f, "(")?;
-							let mut tup_first = true;
-							for i in ii {
-								if !tup_first {
-									write!(f, ",")?;
-								}
-								write!(f, "{i}")?;
-								tup_first = false;
-							}
-							write!(f, "): ")
-						}
-					}?;
-					write!(f, "{x}")?;
-					first = false;
-					incr(&mut ii);
+					x => {
+						vec![index_conv(x)]
+					}
+				};
+				Type::Array {
+					opt,
+					dim: ndim.into_boxed_slice(),
+					element: Box::new(elem),
 				}
-				write!(f, "]")
 			}
-			Value::Set(v) => {
-				let mut first = true;
-				write!(f, "{{")?;
-				for x in v {
-					if !first {
-						write!(f, ", ")?;
+			TyData::Set(_, opt, elem) => Type::Set(
+				opt,
+				Box::new(Type::from_compiler(
+					db,
+					str_interner,
+					type_map,
+					enum_map,
+					elem,
+				)),
+			),
+			TyData::Tuple(opt, li) => {
+				let tmp = if opt == OptType::NonOpt {
+					value
+				} else {
+					todo!()
+				};
+				let Type::Tuple(_, li) = (if let Some(x) = type_map.get(&tmp) {
+					x
+				} else {
+					let mut v = Vec::with_capacity(li.len());
+					for ty in li.iter() {
+						v.push(Type::from_compiler(
+							db,
+							str_interner,
+							type_map,
+							enum_map,
+							*ty,
+						))
 					}
-					write!(f, "{}", x)?;
-					first = false;
-				}
-				write!(f, "}}")
+					type_map.insert(tmp, Type::Tuple(opt, v.into_boxed_slice().into()));
+					&type_map[&tmp]
+				}) else {
+					unreachable!()
+				};
+				Type::Tuple(opt, li.clone())
 			}
-			Value::Tuple(v) => {
-				let mut first = true;
-				write!(f, "(")?;
-				for x in v {
-					if !first {
-						write!(f, ", ")?;
+			TyData::Record(opt, li) => {
+				let tmp = if opt == OptType::NonOpt {
+					value
+				} else {
+					todo!()
+				};
+				let Type::Record(_, li) = (if let Some(x) = type_map.get(&tmp) {
+					x
+				} else {
+					let mut v = Vec::with_capacity(li.len());
+					for (name, ty) in li.iter() {
+						v.push((
+							str_interner(*name),
+							Type::from_compiler(db, str_interner, type_map, enum_map, *ty),
+						))
 					}
-					write!(f, "{}", x)?;
-					first = false;
-				}
-				write!(f, ")")
+					type_map.insert(tmp, Type::Record(opt, v.into_boxed_slice().into()));
+					&type_map[&tmp]
+				}) else {
+					unreachable!()
+				};
+				Type::Record(opt, li.clone())
 			}
-			Value::Record(rec) => {
-				let mut first = true;
-				write!(f, "(")?;
-				for (k, v) in rec {
-					if !first {
-						write!(f, ", ")?;
-					}
-					write!(f, "{}: {}", k, v)?;
-					first = false;
-				}
-				write!(f, ")")
+			_ => unreachable!("invalid user facing type {:?}", data),
+		}
+	}
+
+	fn is_opt(&self) -> bool {
+		matches!(
+			self,
+			Type::Boolean(OptType::Opt)
+				| Type::Integer(OptType::Opt)
+				| Type::Float(OptType::Opt)
+				| Type::Enum(OptType::Opt, _)
+				| Type::String(OptType::Opt)
+				| Type::Array {
+					opt: OptType::Opt,
+					dim: _,
+					element: _
+				} | Type::Set(OptType::Opt, _)
+				| Type::Tuple(OptType::Opt, _)
+				| Type::Record(OptType::Opt, _)
+		)
+	}
+}
+
+impl Display for Type {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let opt_str = |opt| if opt == &OptType::Opt { "opt " } else { "" };
+		match self {
+			Type::Boolean(opt) => write!(f, "{}bool", opt_str(opt)),
+			Type::Integer(opt) => write!(f, "{}int", opt_str(opt)),
+			Type::Float(opt) => write!(f, "{}float", opt_str(opt)),
+			Type::Enum(opt, e) => write!(f, "{}{}", opt_str(opt), e.name()),
+			Type::String(opt) => write!(f, "{}string", opt_str(opt)),
+			Type::Annotation(opt) => write!(f, "{}ann", opt_str(opt)),
+			Type::Array { opt, dim, element } => {
+				write!(
+					f,
+					"{}array[{}] of {}",
+					opt_str(opt),
+					dim.iter().format(", "),
+					element
+				)
+			}
+			Type::Set(opt, element) => write!(f, "{}set of {}", opt_str(opt), element),
+			Type::Tuple(opt, members) => {
+				write!(f, "{}tuple({})", opt_str(opt), members.iter().format(", "))
+			}
+			Type::Record(opt, members) => {
+				let mty = members
+					.iter()
+					.format_with(", ", |(k, ty), f| f(&format_args!("{}: {}", ty, k)));
+				write!(f, "{}record({})", opt_str(opt), mty)
 			}
 		}
 	}
@@ -253,9 +368,9 @@ impl Display for Value {
 #[derive(Debug)]
 pub enum Message<'a> {
 	/// (Intermediate) solution emitted in the process
-	Solution(BTreeMap<String, Value>),
+	Solution(FxHashMap<&'a str, Value>),
 	/// Statistical information of the shackle or solving process
-	Statistic(&'a Map<String, serde_json::Value>),
+	Statistic(Vec<(&'a str, serde_json::Value)>),
 	/// Trace messages emitted during the shackle process
 	Trace(&'a str),
 	/// Warning messages emitted by shackle or the solver
@@ -272,13 +387,13 @@ impl<'a> Display for Message<'a> {
 				writeln!(f, "----------")
 			}
 			Message::Statistic(map) => {
-				for (name, val) in *map {
+				for (name, val) in map {
 					writeln!(f, "%%%mzn-stat: {}={}", name, val)?;
 				}
 				writeln!(f, "%%%mzn-stat-end")
 			}
-			Message::Trace(msg) => write!(f, "% mzn-trace: {}", msg),
-			Message::Warning(msg) => write!(f, "% WARNING: {}", msg),
+			Message::Trace(msg) => writeln!(f, "% mzn-trace: {}", msg),
+			Message::Warning(msg) => writeln!(f, "% WARNING: {}", msg),
 		}
 	}
 }
@@ -299,13 +414,206 @@ impl Program {
 		let printer = PrettyPrinter::new_compat(&self.db, &self.code);
 		out.write_all(printer.pretty_print().as_bytes())
 	}
+
+	/// Add and parse data to be used by the program.
+	pub fn add_data_files<'a>(
+		&mut self,
+		files: impl Iterator<Item = &'a Path>,
+	) -> Result<(), Error> {
+		// First parse all files:
+		// - most values will be simple values that can be directly assigned
+		// - some values will be values of enumerated types, possible part of tuples, records, or indices.
+		// - files can also contain the constructors for enumerated types.
+		let mut data = Vec::new();
+		let mut names = FxHashSet::default();
+		for f in files {
+			let src = SourceFile::try_from(f)?;
+			match f.extension().and_then(OsStr::to_str) {
+				Some("dzn") => {
+					// Parse the DZN file
+					let assignments = parse_dzn(&src)?;
+					data.reserve(assignments.len());
+					names.reserve(assignments.len());
+					// Match the parser
+					for asg in assignments {
+						let ident = asg.assignee().cast::<Identifier>().unwrap();
+						if let Some((k, ty)) = self.input_types.get_key_value::<str>(&ident.name())
+						{
+							let val = collect_dzn_value(&src, &asg.definition(), ty)?;
+							data.push((k, ty, val));
+							// Identifier already seen
+							if names.contains(k) || self.input_data.contains_key(k) {
+								return Err(error::IdentifierAlreadyDefined {
+									src,
+									span: asg.cst_node().as_ref().byte_range().into(),
+									identifier: k.to_string(),
+								}
+								.into());
+							}
+							names.insert(k);
+						} else if let Some((k, e)) =
+							self.enum_types.get_key_value::<str>(&ident.name())
+						{
+							let mut inner = e.state.lock().unwrap();
+							if matches!(*inner, EnumInner::NoDefinition) {
+								(*inner).collect_definition(&src, &asg.definition())?
+							} else {
+								return Err(error::IdentifierAlreadyDefined {
+									src,
+									span: asg.cst_node().as_ref().byte_range().into(),
+									identifier: k.to_string(),
+								}
+								.into());
+							}
+						} else {
+							// Unknown identifier
+							return Err(error::UndefinedIdentifier {
+								src,
+								span: ident.cst_node().as_ref().byte_range().into(),
+								identifier: ident.name().to_string(),
+							}
+							.into());
+						}
+					}
+				}
+				Some("json") => {
+					let assignments = serde_json::Deserializer::from_str(src.contents())
+						.deserialize_map(SerdeFileVisitor {
+							input_types: &self.input_types,
+							enum_types: &self.enum_types,
+						})
+						.map_err(|err| Error::from_serde_json(err, &src))?;
+
+					data.reserve(assignments.len());
+					names.reserve(assignments.len());
+					for asg in assignments {
+						// Identifier already seen
+						if names.contains(asg.0) || self.input_data.contains_key(asg.0) {
+							return Err(error::IdentifierAlreadyDefined {
+								src,
+								span: (0, 0).into(), // TODO: actual byte range
+								identifier: asg.0.to_string(),
+							}
+							.into());
+						}
+						names.insert(asg.0);
+						data.push(asg);
+					}
+				}
+				_ => {
+					return Err(error::FileError {
+						file: f.into(),
+						message: format!(
+							"Attempting to read data file using unknown extension \"{}\"",
+							f.display()
+						),
+						other: vec![],
+					}
+					.into());
+				}
+			};
+		}
+		// Topologically sort the constructors to allow us to resolve the dependencies
+		// data.sort_by(|_a, _b| todo!());
+
+		// Itererate between initializing the enumerated types and creating the final values for the interpreter
+		for (key, ty, val) in data {
+			let _none = self.input_data.insert(key.clone(), val.resolve_value(ty)?);
+			debug_assert_eq!(_none, None);
+		}
+
+		Ok(())
+	}
+}
+
+/// Get a mapping from input/output identifiers to their computed types or enumerated type declaration
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ModelIoInterface {
+	pub input: FxHashMap<Arc<str>, crate::Type>,
+	pub output: FxHashMap<Arc<str>, crate::Type>,
+	pub enums: FxHashMap<Arc<str>, Arc<crate::Enum>>,
+}
+
+impl ModelIoInterface {
+	fn new(db: &dyn Thir) -> Self {
+		let sh = db.model_thir();
+		let val = sh.get();
+		let model = val.as_ref();
+
+		// Local interner
+		let mut interner: FxHashMap<InternedString, Arc<str>> = FxHashMap::default();
+		let mut resolve_name = |s| {
+			interner
+				.entry(s)
+				.or_insert_with(|| Arc::from(s.value(db.upcast())))
+				.clone()
+		};
+		let mut type_map = FxHashMap::default();
+
+		// Create a map of enumerations
+		let mut enums = FxHashMap::default();
+		for (_, e) in model.enumerations() {
+			let name = resolve_name(e.enum_type().name(db.upcast()));
+			if let Some(_ctor) = e.definition() {
+				log::warn!("TODO: enumerated type {} is defined in the model and member can currently not be constructed in data", name);
+				// TODO: determine dependencies or directly initialize the enumerated type
+				enums.insert(name.clone(), Arc::new(Enum::model_defined(name, [])));
+			} else {
+				enums.insert(name.clone(), Arc::new(Enum::from_data(name)));
+			}
+		}
+
+		// Find the annotation identifiers
+		let reg = db.identifier_registry();
+		let output_ann = reg.output;
+		let no_output_ann = reg.no_output;
+
+		// Determine input and output from declarations
+		let mut input = FxHashMap::default();
+		let mut output = FxHashMap::default();
+		let mut insert_decl = |map: &mut FxHashMap<Arc<str>, crate::Type>, decl: &Declaration| {
+			let name = resolve_name(decl.name().unwrap().0);
+			let ty = crate::Type::from_compiler(
+				db.upcast(),
+				&mut resolve_name,
+				&mut type_map,
+				&enums,
+				decl.domain().ty(),
+			);
+			map.insert(name, ty);
+		};
+		for (_, decl) in model.all_declarations() {
+			// Determine whether declaration is part of input
+			if decl.top_level()
+				&& decl.domain().ty().known_par(db.upcast())
+				&& decl.definition().is_none()
+			{
+				insert_decl(&mut input, decl)
+			}
+
+			// Determine whether declaration is part of output
+			let mut should_output = None;
+			if decl.annotations().has(model, output_ann) {
+				should_output = Some(true)
+			} else if decl.annotations().has(model, no_output_ann) {
+				should_output = Some(false)
+			}
+			if should_output == Some(true)
+				|| (should_output.is_none()
+					&& decl.top_level() && !decl.domain().ty().known_par(db.upcast())
+					&& decl.definition().is_none())
+			{
+				insert_decl(&mut output, decl)
+			}
+		}
+
+		ModelIoInterface {
+			input,
+			output,
+			enums,
+		}
+	}
 }
 
 #[cfg(test)]
-mod tests {
-	#[test]
-	fn it_works() {
-		let result = 2 + 2;
-		assert_eq!(result, 4);
-	}
-}
+mod tests {}

@@ -2,17 +2,18 @@ use lsp_server::ResponseError;
 use lsp_types::{
 	request::Completion, CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse,
 };
-use shackle::db::CompilerDatabase;
-use shackle::file::ModelRef;
-use shackle::hir::{
-	db::Hir,
-	source::{find_expression, Point},
-	Expression, PatternTy,
+use shackle_compiler::{
+	db::CompilerDatabase,
+	file::ModelRef,
+	hir::{
+		db::Hir,
+		source::{find_expression, Point},
+		Expression, PatternTy,
+	},
+	ty::TyData,
 };
-use shackle::ty::TyData;
 
-use crate::db::LanguageServerContext;
-use crate::dispatch::RequestHandler;
+use crate::{db::LanguageServerContext, dispatch::RequestHandler};
 
 #[derive(Debug)]
 pub struct CompletionsHandler;
@@ -210,9 +211,8 @@ mod test {
 	use expect_test::expect;
 	use lsp_types::Url;
 
-	use crate::handlers::test::test_handler;
-
 	use super::CompletionsHandler;
+	use crate::handlers::test::test_handler;
 
 	#[test]
 	fn test_completions() {

@@ -1,6 +1,6 @@
 use lsp_server::ResponseError;
 use lsp_types::TextDocumentPositionParams;
-use shackle::{db::CompilerDatabase, file::ModelRef, syntax::db::SourceParser};
+use shackle_compiler::{db::CompilerDatabase, file::ModelRef, syntax::db::SourceParser};
 
 use crate::{db::LanguageServerContext, dispatch::RequestHandler, extensions::ViewAst};
 
@@ -29,9 +29,8 @@ mod test {
 	use expect_test::expect;
 	use lsp_types::Url;
 
-	use crate::handlers::test::test_handler_display;
-
 	use super::ViewAstHandler;
+	use crate::handlers::test::test_handler_display;
 
 	#[test]
 	fn test_view_ast() {
@@ -202,7 +201,9 @@ var foo(1, 3): y;
                             IntegerLiteral(
                                 IntegerLiteral {
                                     cst_kind: "integer_literal",
-                                    value: 1,
+                                    value: Ok(
+                                        1,
+                                    ),
                                 },
                             ),
                         ),
@@ -244,13 +245,17 @@ var foo(1, 3): y;
                                                 IntegerLiteral(
                                                     IntegerLiteral {
                                                         cst_kind: "integer_literal",
-                                                        value: 1,
+                                                        value: Ok(
+                                                            1,
+                                                        ),
                                                     },
                                                 ),
                                                 IntegerLiteral(
                                                     IntegerLiteral {
                                                         cst_kind: "integer_literal",
-                                                        value: 3,
+                                                        value: Ok(
+                                                            3,
+                                                        ),
                                                     },
                                                 ),
                                             ],

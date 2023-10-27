@@ -1,6 +1,6 @@
 use lsp_server::ResponseError;
 use lsp_types::TextDocumentPositionParams;
-use shackle::{db::CompilerDatabase, file::ModelRef, syntax::db::SourceParser};
+use shackle_compiler::{db::CompilerDatabase, file::ModelRef, syntax::db::SourceParser};
 
 use crate::{db::LanguageServerContext, dispatch::RequestHandler, extensions::ViewCst};
 
@@ -33,9 +33,8 @@ mod test {
 	use expect_test::expect;
 	use lsp_types::Url;
 
-	use crate::handlers::test::test_handler_display;
-
 	use super::ViewCstHandler;
+	use crate::handlers::test::test_handler_display;
 
 	#[test]
 	fn test_view_cst() {

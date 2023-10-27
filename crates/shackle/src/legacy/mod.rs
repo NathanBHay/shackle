@@ -1,270 +1,85 @@
 use std::{
-	collections::BTreeMap,
-	io::{BufRead, BufReader},
-	ops::Range,
+	fmt::Display,
+	io::{BufRead, BufReader, Write},
+	ops::Deref,
 	path::PathBuf,
 	process::{Command, Stdio},
+	sync::Arc,
 };
 
-use serde_json::Map;
+use itertools::Itertools;
+use rustc_hash::FxHashMap;
+use serde::{
+	de::{DeserializeSeed, Error as SerdeError, IgnoredAny, Visitor},
+	Deserializer,
+};
 use tempfile::Builder;
 
 use crate::{
-	db::CompilerDatabase,
-	diagnostics::{FileError, InternalError},
-	hir::{db::Hir, Identifier},
-	ty::{Ty, TyData},
-	Message, Program, Status, Value,
+	data::serde::SerdeValueVisitor,
+	error::{FileError, InternalError},
+	value::{Array, EnumInner, EnumRangeInclusive, EnumValue, Index, Polarity, Set, Value},
+	Enum, Error, Message, OptType, Program, Result, Status, Type,
 };
-
-fn flatten_array(
-	db: &CompilerDatabase,
-	content: &mut Vec<Value>,
-	arr: serde_json::Value,
-	ndim: usize,
-	elem_ty: Ty,
-) -> Result<(), InternalError> {
-	if let serde_json::Value::Array(vec) = arr {
-		if ndim > 1 {
-			for sub_arr in vec {
-				flatten_array(db, content, sub_arr, ndim - 1, elem_ty)?;
-			}
-		} else {
-			for elem in vec {
-				content.push(deserialize_legacy_value(db, elem_ty, elem)?);
-			}
-		}
-		Ok(())
-	} else {
-		Err(InternalError::new(
-			"value from legacy interpreter does not have the expected number of dimensions",
-		))
-	}
-}
-
-fn deserialize_legacy_value(
-	db: &CompilerDatabase,
-	ty: Ty,
-	val: serde_json::Value,
-) -> Result<Value, InternalError> {
-	match val {
-		serde_json::Value::Null => {
-			if ty.known_occurs(db) {
-				Err(InternalError::new(
-					format!("legacy interpreter returned an absent value for variable with a type `{}',  known to occur", ty.pretty_print(db)),
-				))
-			} else {
-				Ok(Value::Absent)
-			}
-		}
-		serde_json::Value::Bool(b) => {
-			if let TyData::Boolean(_, _) = ty.lookup(db) {
-				Ok(Value::Boolean(b))
-			} else {
-				Err(InternalError::new(format!(
-					"legacy interpreter returned a Boolean value for variable of type `{}'",
-					ty.pretty_print(db)
-				)))
-			}
-		}
-		serde_json::Value::Number(v) => {
-			if v.is_f64() {
-				if let TyData::Float(_, _) = ty.lookup(db) {
-					Ok(Value::Float(v.as_f64().unwrap()))
-				} else {
-					Err(InternalError::new(format!(
-						"legacy interpreter returned a floating point value for variable of type `{}'",
-						ty.pretty_print(db)
-					)))
-				}
-			} else {
-				assert!(v.is_i64());
-				match ty.lookup(db) {
-					TyData::Integer(_, _) => Ok(Value::Integer(v.as_i64().unwrap())),
-					TyData::Float(_, _) => Ok(Value::Float(v.as_i64().unwrap() as f64)),
-					_ => Err(InternalError::new(format!(
-						"legacy interpreter returned a integer value for variable of type `{}'",
-						ty.pretty_print(db)
-					))),
-				}
-			}
-		}
-		serde_json::Value::String(v) => {
-			if let TyData::String(_) = ty.lookup(db) {
-				Ok(Value::String(v))
-			} else {
-				Err(InternalError::new(format!(
-					"legacy interpreter returned a String value for variable of type `{}'",
-					ty.pretty_print(db)
-				)))
-			}
-		}
-		serde_json::Value::Array(v) => match ty.lookup(db) {
-			TyData::Array {
-				opt: _,
-				dim,
-				element,
-			} => {
-				if let TyData::Tuple(_, tt) = dim.lookup(db) {
-					// Determine the index sets of the array
-					// FIXME should be returned from the model
-					let mut ranges = Vec::with_capacity(tt.len());
-					let arr = serde_json::Value::Array(v);
-					let mut ii = &arr;
-					while let serde_json::Value::Array(v) = ii {
-						ranges.push(1..(v.len() + 1) as i64);
-						if let Some(fst) = v.last() {
-							ii = fst;
-						} else {
-							ranges.push(1..1);
-						}
-					}
-					// Flatten content
-					let mut content = Vec::new();
-					flatten_array(db, &mut content, arr, tt.len(), element)?;
-
-					Ok(Value::Array(ranges, content))
-				} else {
-					let range: Range<i64> = 1..(v.len() + 1) as i64;
-					let content = v
-						.into_iter()
-						.map(|val| deserialize_legacy_value(db, element, val))
-						.collect::<Result<Vec<_>, _>>()?;
-					Ok(Value::Array(vec![range], content))
-				}
-			}
-			TyData::Tuple(_, types) => {
-				assert_eq!(types.len(), v.len());
-				v.into_iter()
-					.zip(types.iter())
-					.map(|(val, ty)| deserialize_legacy_value(db, *ty, val))
-					.collect::<Result<Vec<_>, _>>()
-					.map(Value::Tuple)
-			}
-			_ => Err(InternalError::new(format!(
-				"legacy interpreter returned a Array value for variable of type `{}'",
-				ty.pretty_print(db)
-			))),
-		},
-		serde_json::Value::Object(mut obj) => match ty.lookup(db) {
-			TyData::Enum(_, _, _) => {
-				let e = if let Some(s) = obj["e"].as_str() {
-					String::from(s)
-				} else if let Some(x) = obj["e"].as_i64() {
-					x.to_string()
-				} else if let Value::Enum(s) = deserialize_legacy_value(db, ty, obj["e"].clone())? {
-					s
-				} else {
-					return Err(InternalError::new(format!(
-						"lagacy interpreter returned an invalid enum value `{:?}'",
-						obj
-					)));
-				};
-				Ok(if obj.contains_key("c") {
-					assert_eq!(obj.len(), 2);
-					Value::Enum(format!("{}({})", obj["c"].as_str().unwrap(), e))
-				} else if obj.contains_key("i") {
-					assert_eq!(obj.len(), 2);
-					Value::Enum(format!("to_enum({}, {})", e, obj["i"].as_i64().unwrap()))
-				} else {
-					assert_eq!(obj.len(), 1);
-					Value::Enum(e)
-				})
-			}
-			TyData::Set(_, _, elem) => {
-				let set = obj.remove("set").unwrap();
-				if let serde_json::Value::Array(set) = set {
-					match elem.lookup(db) {
-						TyData::Integer(_, _) if matches!(set[0], serde_json::Value::Array(_)) => {
-							let mut content = Vec::new();
-							for mem in set {
-								if let serde_json::Value::Array(x) = mem {
-									assert_eq!(x.len(), 2);
-									for i in x[0].as_i64().unwrap()..=x[1].as_i64().unwrap() {
-										content.push(Value::Integer(i))
-									}
-								} else {
-									return Err(InternalError::new(format!(
-										"legacy interpreter invalid range in set members `{}'",
-										mem
-									)));
-								}
-							}
-							Ok(Value::Set(content))
-						}
-						_ => {
-							let content = set
-								.into_iter()
-								.map(|v| deserialize_legacy_value(db, elem, v))
-								.collect::<Result<Vec<_>, _>>()?;
-							Ok(Value::Set(content))
-						}
-					}
-				} else {
-					Err(InternalError::new(format!(
-						"legacy interpreter returned invalid set members `{}'",
-						set
-					)))
-				}
-			}
-			TyData::Record(_, types) => {
-				assert_eq!(types.len(), obj.len());
-				let mut rec = BTreeMap::new();
-				for (name, tt) in types.iter() {
-					let name = name.value(db);
-					let val = deserialize_legacy_value(db, *tt, obj.remove(&name).unwrap())?;
-					rec.insert(name, val);
-				}
-				Ok(Value::Record(rec))
-			}
-			_ => Err(InternalError::new(format!(
-				"legacy interpreter returned a Object value for variable of type `{}'",
-				ty.pretty_print(db)
-			))),
-		},
-	}
-}
 
 impl Program {
 	/// Run the program in the current state
 	/// Solutions are emitted to the callback, and the resulting status is returned.
-	pub fn run<F: Fn(&Message) -> bool>(&mut self, msg_callback: F) -> Status {
+	pub fn run<F: Fn(&Message) -> Result<()>>(&mut self, msg_callback: F) -> Result<Status> {
+		// Create new (temporary) file used as input for the interpreter
 		let tmpfile = Builder::new().suffix(".shackle.mzn").tempfile();
 		let mut tmpfile = match tmpfile {
 			Err(err) => {
-				return Status::Err(
-					FileError {
-						file: PathBuf::from("tempfile"),
-						message: err.to_string(),
-						other: Vec::new(),
-					}
-					.into(),
-				);
+				return Err(FileError {
+					file: PathBuf::from("tempfile"),
+					message: err.to_string(),
+					other: Vec::new(),
+				}
+				.into());
 			}
 			Ok(file) => file,
 		};
-		if let Err(err) = self.write(tmpfile.as_file_mut()) {
-			return Status::Err(
-				FileError {
-					file: PathBuf::from(tmpfile.path()),
-					message: format!("unable to write model to temporary file: {}", err),
-					other: vec![],
-				}
-				.into(),
-			);
+		let tmp_path = tmpfile.path().to_owned();
+		let write_err = |err| {
+			Error::from(FileError {
+				file: tmp_path.clone(),
+				message: format!("unable to write model to temporary file: {}", err),
+				other: vec![],
+			})
+		};
+		// Write content to file
+		let file_mut = tmpfile.as_file_mut();
+		// Write model to file
+		self.write(file_mut).map_err(write_err)?;
+		// Write data to file
+		for (name, ty) in &self.input_types {
+			let val = if let Some(val) = self.input_data.get(name) {
+				val
+			} else if ty.is_opt() {
+				&Value::Absent
+			} else {
+				todo!("add new error type - {} is not initialized", name)
+			};
+			writeln!(file_mut, "{name} = {};", LegacyValue { val, ty }).map_err(write_err)?;
+		}
+		for e in &self.legacy_enums {
+			if e.state.lock().unwrap().deref() == &EnumInner::NoDefinition {
+				todo!("add new error type - {} is not initialized", e.name())
+			}
+			writeln!(file_mut, "{};", LegacyEnum(e)).map_err(write_err)?;
 		}
 
+		// Construct command for the MiniZinc intepreter
 		let mut cmd = Command::new("minizinc");
 		cmd.stdin(Stdio::null())
 			.stdout(Stdio::piped())
 			.stderr(Stdio::inherit())
-			.arg(tmpfile.path())
+			.arg(&tmp_path)
 			.args([
 				"--output-mode",
 				"json",
 				"--json-stream",
 				"--ignore-stdlib",
-				"--output-time",
 				"--output-objective",
 				"--output-output-item",
 				"--intermediate-solutions",
@@ -281,106 +96,30 @@ impl Program {
 		let mut child = cmd.spawn().unwrap(); // TODO: fix unwrap
 		let stdout = child.stdout.take().unwrap();
 
-		let ty_map = self.db.variable_type_map();
 		let mut status = Status::Unknown;
 		for line in BufReader::new(stdout).lines() {
 			match line {
-				Err(err) => {
-					return Status::Err(
-						InternalError::new(format!("minizinc output error: {}", err)).into(),
-					);
+				Err(e) => {
+					return Err(InternalError::new(format!(
+						"Unable to read interpreter output: “{e}”"
+					))
+					.into())
 				}
 				Ok(line) => {
-					let mut obj = serde_json::from_str::<Map<String, serde_json::Value>>(&line)
-						.expect("bad message in mzn json");
-					let ty = obj["type"].as_str().expect("bad type field in mzn json");
-					match ty {
-						"statistics" => {
-							if let serde_json::Value::Object(map) = &obj["statistics"] {
-								msg_callback(&Message::Statistic(map));
-							} else {
-								return Status::Err(
-									InternalError::new(format!(
-										"minizinc invalid statistics message: {}",
-										obj["statistics"]
-									))
-									.into(),
-								);
-							}
-						}
-						"solution" => {
-							let mut sol = BTreeMap::new();
-							if let serde_json::Value::Object(map) = obj["output"]
-								.as_object_mut()
-								.unwrap()
-								.remove("json")
-								.unwrap()
-							{
-								for (k, v) in map {
-									let ident = Identifier::new(&k, &self.db);
-									let ty = ty_map[&ident];
-
-									let val = match deserialize_legacy_value(&self.db, ty, v) {
-										Ok(val) => val,
-										Err(e) => return Status::Err(e.into()),
-									};
-									sol.insert(k, val);
+					match serde_json::Deserializer::from_str(&line)
+						.deserialize_map(SerdeMessageVisitor(&self.output_types))
+						.map_err(|e| Error::from_serde_json(e, &Arc::new(line.clone()).into()))?
+					{
+						LegacyOutput::Status(s) => status = s,
+						LegacyOutput::Msg(msg) => {
+							if let Message::Solution(_) = msg {
+								if status == Status::Unknown {
+									status = Status::Satisfied
 								}
-							} else {
-								panic!("invalid output.json field in mzn json")
 							}
-							msg_callback(&Message::Solution(sol));
-							if let Status::Unknown = status {
-								status = Status::Satisfied;
-							}
+							msg_callback(&msg)?
 						}
-						"status" => match obj["status"]
-							.as_str()
-							.expect("bad status field in mzn json")
-						{
-							"ALL_SOLUTIONS" => status = Status::AllSolutions,
-							"OPTIMAL_SOLUTION" => status = Status::Optimal,
-							"UNSATISFIABLE" => status = Status::Infeasible,
-							"UNBOUNDED" => todo!(),
-							"UNSAT_OR_UNBOUNDED" => todo!(),
-							"UNKNOWN" => status = Status::Unknown,
-							"ERROR" => {
-								status = Status::Err(
-									InternalError::new(
-										"Error occurred, but no message was provided",
-									)
-									.into(),
-								)
-							}
-							s => {
-								return Status::Err(
-									InternalError::new(format!(
-										"minizinc unknown status type: {}",
-										s
-									))
-									.into(),
-								);
-							}
-						},
-						"error" => {
-							return Status::Err(
-								InternalError::new(format!("minizinc error: {}", obj["message"]))
-									.into(),
-							);
-						}
-						"warning" => {
-							msg_callback(&Message::Warning(
-								obj["message"]
-									.as_str()
-									.expect("invalid message field in mzn json object"),
-							));
-						}
-						s => {
-							return Status::Err(
-								InternalError::new(format!("minizinc unknown message type: {}", s))
-									.into(),
-							);
-						}
+						LegacyOutput::Error(err) => return Err(err),
 					}
 				}
 			}
@@ -393,9 +132,568 @@ impl Program {
 						code.code().unwrap()
 					)
 				};
-				status
+				Ok(status)
 			}
-			Err(e) => Status::Err(InternalError::new(format!("process error: {}", e)).into()),
+			Err(e) => Err(InternalError::new(format!("process error: {}", e)).into()),
+		}
+	}
+}
+
+struct LegacyValue<'a> {
+	val: &'a Value,
+	ty: &'a Type,
+}
+
+impl<'a> Display for LegacyValue<'a> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let val = self.val;
+		let ty = self.ty;
+
+		let is_opt = ty.is_opt();
+		if is_opt {
+			if val == &Value::Absent {
+				return write!(f, "(false, {})", DummyValue(ty));
+			} else {
+				write!(f, "(true, ")?;
+			}
+		}
+		match val {
+			Value::Absent => unreachable!("found absent assigned to non-opt parameter"),
+			Value::Infinity(p) => {
+				write!(f, "{}infinity", if p == &Polarity::Neg { "-" } else { "" })?
+			}
+			Value::Boolean(v) => write!(f, "{}", v)?,
+			Value::Integer(v) => write!(f, "{}", v)?,
+			Value::Float(v) => write!(f, "{}", v)?,
+			Value::String(v) => write!(f, "\"{}\"", v)?,
+			Value::Enum(v) => write!(f, "{}", v.int_val())?,
+			Value::Ann(name, args) => {
+				if args.is_empty() {
+					write!(f, "{name}")?
+				} else {
+					write!(f, "{name}({})", args.iter().format(", "))?
+				}
+			}
+			Value::Array(v) => {
+				let Type::Array {
+					opt: _,
+					dim: _,
+					element,
+				} = ty
+				else {
+					unreachable!()
+				};
+				let extract_idx = |x: &Value| match x {
+					Value::Integer(i) => *i,
+					Value::Enum(v) => v.int_val() as i64,
+					_ => unreachable!(),
+				};
+				if v.is_empty() {
+					write!(f, "[]")?;
+				} else if v.dim() == 1 {
+					let first = extract_idx(&(v.iter().next().unwrap().0[0]));
+					write!(
+						f,
+						"[{first}: {}]",
+						v.iter()
+							.map(|(_, val)| LegacyValue { val, ty: element })
+							.format(",")
+					)?;
+				} else {
+					write!(
+						f,
+						"[{}]",
+						v.iter().format_with(",", |(ii, val), f| f(&format_args!(
+							"({}): {}",
+							ii.iter().map(extract_idx).format(","),
+							LegacyValue { val, ty: element }
+						)))
+					)?;
+				}
+			}
+			Value::Set(s) => match s {
+				Set::Enum(s) => write!(
+					f,
+					"{}",
+					s.iter().format_with(" union ", |elt, f| f(&format_args!(
+						"{}..{}",
+						elt.start().int_val(),
+						elt.end().int_val()
+					)))
+				)?,
+				Set::Int(s) => write!(
+					f,
+					"{}",
+					s.iter().format_with(" union ", |elt, f| f(&format_args!(
+						"{}..{}",
+						elt.start(),
+						elt.end()
+					)))
+				)?,
+				Set::Float(s) => write!(
+					f,
+					"{}",
+					s.iter().format_with(" union ", |elt, f| f(&format_args!(
+						"{}..{}",
+						elt.start(),
+						elt.end()
+					)))
+				)?,
+			},
+			Value::Tuple(v) => {
+				let Type::Tuple(_, tys) = ty else {
+					unreachable!()
+				};
+				write!(
+					f,
+					"({}{})",
+					tys.iter()
+						.zip_eq(v)
+						.map(|(ty, val)| LegacyValue { val, ty })
+						.format(","),
+					if tys.len() == 1 { "," } else { "" }
+				)?;
+			}
+			Value::Record(v) => {
+				let Type::Record(_, tys) = ty else {
+					unreachable!()
+				};
+				write!(
+					f,
+					"({}{})",
+					tys.iter()
+						.map(|(_, t)| t)
+						.zip_eq(v.iter().map(|(_, v)| v))
+						.map(|(ty, val)| LegacyValue { val, ty })
+						.format(","),
+					if tys.len() == 1 { "," } else { "" }
+				)?;
+			}
+		}
+		if is_opt {
+			write!(f, ")")?
+		}
+		Ok(())
+	}
+}
+struct DummyValue<'a>(&'a Type);
+impl<'a> Display for DummyValue<'a> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let ty = self.0;
+		match ty {
+			Type::Boolean(_) => write!(f, "true"),
+			Type::Integer(_) => write!(f, "0"),
+			Type::Float(_) => write!(f, "0.0"),
+			Type::Enum(_, _) => write!(f, "1"),
+			Type::String(_) => write!(f, "\"\""),
+			Type::Annotation(_) => write!(f, "empty_annotation"),
+			Type::Array {
+				opt: _,
+				dim: _,
+				element: _,
+			} => write!(f, "[]"),
+			Type::Set(_, _) => write!(f, "{{}}"),
+			Type::Tuple(_, tys) => {
+				write!(
+					f,
+					"({}{})",
+					tys.iter().map(DummyValue).format(","),
+					if tys.len() == 1 { "," } else { "" }
+				)
+			}
+			Type::Record(_, tys) => {
+				write!(
+					f,
+					"({}{})",
+					tys.iter().map(|(_, ty)| DummyValue(ty)).format(","),
+					if tys.len() == 1 { "," } else { "" }
+				)
+			}
+		}
+	}
+}
+
+struct LegacyEnum<'a>(&'a Enum);
+impl<'a> Display for LegacyEnum<'a> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		const INT: Type = Type::Integer(crate::OptType::NonOpt);
+		write!(
+			f,
+			"mzn_enum_{} = [{}]",
+			self.0.name(),
+			self.0
+				.lock()
+				.iter()
+				.format_with(",", |(name, idxs, _), f| f(&format_args!(
+					"({:?}, [{}])",
+					name,
+					idxs.iter().format_with(",", |idx, g| g(&format_args!(
+						"(0, {}..{})",
+						LegacyValue {
+							val: &idx.start(),
+							ty: &INT
+						},
+						LegacyValue {
+							val: &idx.end(),
+							ty: &INT
+						}
+					)))
+				)))
+		)
+	}
+}
+
+struct SerdeMessageVisitor<'a>(pub &'a FxHashMap<Arc<str>, Type>);
+
+enum LegacyOutput<'a> {
+	Status(Status),
+	Msg(Message<'a>),
+	Error(Error),
+}
+
+impl<'de, 'a> Visitor<'de> for SerdeMessageVisitor<'a> {
+	type Value = LegacyOutput<'de>;
+
+	fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(formatter, "minizinc interpreter message")
+	}
+
+	fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+		const FIELDS: &[&str] = &[
+			"type",
+			"statistics",
+			"output",
+			"status",
+			"message",
+			"location",
+			"stack",
+			"sections",
+			"what",
+		];
+		let type_map = self.0;
+
+		let mut msg_type = None;
+		let mut statistics = None;
+		let mut message = None;
+		let mut status = None;
+		let mut solution = None;
+
+		while let Some(k) = map.next_key::<&str>()? {
+			match k {
+				"type" => {
+					if msg_type.is_some() {
+						return Err(SerdeError::duplicate_field("type"));
+					}
+					msg_type = Some(map.next_value()?);
+				}
+				"message" => {
+					if message.is_some() {
+						return Err(SerdeError::duplicate_field("message"));
+					}
+					message = Some(map.next_value::<&str>()?);
+				}
+				"output" => {
+					if solution.is_some() {
+						return Err(SerdeError::duplicate_field("output"));
+					}
+					match map.next_value_seed(SerdeWrappedName {
+						name: "json",
+						seed: SerdeOutputVisitor(type_map),
+					})? {
+						Ok(sol) => solution = Some(sol),
+						Err(e) => return Ok(LegacyOutput::Error(e)),
+					}
+				}
+				"statistics" => {
+					if statistics.is_some() {
+						return Err(SerdeError::duplicate_field("statistics"));
+					}
+					statistics = Some(map.next_value()?);
+				}
+				"status" => {
+					if status.is_some() {
+						return Err(SerdeError::duplicate_field("status"));
+					}
+					status = Some(match map.next_value()? {
+						"ALL_SOLUTIONS" => Status::AllSolutions,
+						"OPTIMAL_SOLUTION" => Status::Optimal,
+						"UNSATISFIABLE" => Status::Infeasible,
+						"UNBOUNDED" => Status::Infeasible, // TODO: Should this be seperate?
+						"UNSAT_OR_UNBOUNDED" => Status::Infeasible,
+						"UNKNOWN" => Status::Unknown,
+						"ERROR" => {
+							return Ok(LegacyOutput::Error(
+								InternalError::new("Error occurred, but no message was provided")
+									.into(),
+							))
+						} // TODO: Probably should do something, but we now rely on another error message type
+						s => {
+							return Err(SerdeError::unknown_variant(
+								s,
+								&[
+									"ALL_SOLUTIONS",
+									"OPTIMAL_SOLUTION",
+									"UNSATISFIABLE",
+									"UNBOUNDED",
+									"UNSAT_OR_UNBOUNDED",
+									"UNKNOWN",
+									"ERROR",
+								],
+							));
+						}
+					})
+				}
+				"location" | "stack" | "sections" | "what" => {
+					map.next_value::<IgnoredAny>()?; // TODO: parse additional error/warning information
+				}
+				_ => return Err(SerdeError::unknown_field(k, FIELDS)),
+			}
+		}
+
+		match msg_type {
+			Some("solution") => match solution {
+				None => Err(SerdeError::missing_field("output")),
+				Some(x) => Ok(LegacyOutput::Msg(Message::Solution(x))),
+			},
+			Some("statistics") => match statistics {
+				None => Err(SerdeError::missing_field("statistics")),
+				Some(x) => Ok(LegacyOutput::Msg(Message::Statistic(x))),
+			},
+			Some("error") => match message {
+				None => Err(SerdeError::missing_field("message")),
+				Some(msg) => Ok(LegacyOutput::Error(
+					InternalError::new(format!("minizinc error: {msg}")).into(),
+				)),
+			},
+			Some("warning") => match message {
+				None => Err(SerdeError::missing_field("message")),
+				Some(msg) => Ok(LegacyOutput::Msg(Message::Warning(msg))),
+			},
+			Some("status") => match status {
+				None => Err(SerdeError::missing_field("status")),
+				Some(s) => Ok(LegacyOutput::Status(s)),
+			},
+			None => Err(SerdeError::missing_field("type")),
+			Some(ty) => Err(SerdeError::unknown_variant(
+				ty,
+				&["statistics", "status", ""],
+			)),
+		}
+	}
+}
+
+#[derive(Clone)]
+struct SerdeOutputVisitor<'a>(pub &'a FxHashMap<Arc<str>, Type>);
+
+impl<'de, 'a> Visitor<'de> for SerdeOutputVisitor<'a> {
+	type Value = Result<FxHashMap<&'de str, Value>, Error>;
+
+	fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(formatter, "minizinc output assignment")
+	}
+
+	fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+		let type_map = self.0;
+
+		let mut sol = FxHashMap::default();
+		sol.reserve(type_map.len());
+		while let Some(k) = map.next_key()? {
+			if let Some(ty) = type_map.get(k) {
+				let out_type = ty.type_erase();
+				let v = map.next_value_seed(SerdeValueVisitor(&out_type))?;
+				match v.resolve_value(&out_type) {
+					Ok(v) => {
+						let v = v.reverse_type_erase(ty);
+						sol.insert(k, v);
+					}
+					Err(e) => return Ok(Err(e)),
+				}
+			} else {
+				map.next_value::<IgnoredAny>()?; // Ignore unknown
+			}
+		}
+		Ok(Ok(sol))
+	}
+}
+
+impl<'a, 'de> DeserializeSeed<'de> for SerdeOutputVisitor<'a> {
+	type Value = Result<FxHashMap<&'de str, Value>, Error>;
+
+	fn deserialize<D: serde::Deserializer<'de>>(
+		self,
+		deserializer: D,
+	) -> Result<Self::Value, D::Error> {
+		deserializer.deserialize_map(self)
+	}
+}
+
+struct SerdeWrappedName<X: Clone> {
+	name: &'static str,
+	seed: X,
+}
+
+impl<'de, X: DeserializeSeed<'de> + Clone> DeserializeSeed<'de> for SerdeWrappedName<X> {
+	type Value = X::Value;
+
+	fn deserialize<D: serde::Deserializer<'de>>(
+		self,
+		deserializer: D,
+	) -> Result<Self::Value, D::Error> {
+		deserializer.deserialize_map(self)
+	}
+}
+
+impl<'de, X: DeserializeSeed<'de> + Clone> Visitor<'de> for SerdeWrappedName<X> {
+	type Value = X::Value;
+
+	fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(formatter, "map with {} identifier", self.name)
+	}
+
+	fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+		let mut ret = None;
+
+		while let Some(k) = map.next_key::<&str>()? {
+			if k == self.name {
+				ret = Some(map.next_value_seed(self.seed.clone())?);
+			} else {
+				map.next_value::<IgnoredAny>()?; // Ignore unknown
+			}
+		}
+		match ret {
+			None => Err(SerdeError::missing_field(self.name)),
+			Some(x) => Ok(x),
+		}
+	}
+}
+
+impl Type {
+	fn type_erase(&self) -> Type {
+		let ty = match self {
+			Type::Boolean(_) => Type::Boolean(OptType::NonOpt),
+			Type::Integer(_) => Type::Integer(OptType::NonOpt),
+			Type::Float(_) => Type::Float(OptType::NonOpt),
+			Type::Enum(_, _) => Type::Integer(OptType::NonOpt),
+			Type::String(_) => Type::String(OptType::NonOpt),
+			Type::Annotation(_) => Type::Annotation(OptType::NonOpt),
+			Type::Array {
+				opt: _,
+				dim,
+				element,
+			} => Type::Array {
+				opt: OptType::NonOpt,
+				dim: dim.iter().map(|t| t.type_erase()).collect(),
+				element: element.type_erase().into(),
+			},
+			Type::Set(_, elt) => Type::Set(OptType::NonOpt, elt.type_erase().into()),
+			Type::Tuple(_, elts) => Type::Tuple(
+				OptType::NonOpt,
+				elts.iter().map(|t| t.type_erase()).collect(),
+			),
+			Type::Record(_, elts) => Type::Tuple(
+				OptType::NonOpt,
+				elts.iter().map(|(_, t)| t.type_erase()).collect(),
+			),
+		};
+		if self.is_opt() {
+			Type::Tuple(
+				OptType::NonOpt,
+				Arc::new([Type::Boolean(OptType::NonOpt), ty]),
+			)
+		} else {
+			ty
+		}
+	}
+}
+
+impl Value {
+	fn reverse_type_erase(self, ty: &Type) -> Value {
+		let mut v = self;
+		if ty.is_opt() {
+			let Value::Tuple(mut tup) = v else {
+				panic!("expected opt type tuple")
+			};
+			debug_assert_eq!(tup.len(), 2);
+			let Value::Boolean(occurs) = tup[0] else {
+				panic!("expected opt type tuple")
+			};
+			if !occurs {
+				return Value::Absent;
+			}
+			v = tup.pop().unwrap();
+		}
+		match ty {
+			Type::Enum(_, e) => {
+				let Value::Integer(pos) = v else {
+					panic!("expected integer value")
+				};
+				EnumValue::from_enum_and_pos(e.clone(), pos as usize).into()
+			}
+			Type::Array {
+				opt: _,
+				dim,
+				element,
+			} => {
+				let Value::Array(x) = v else {
+					panic!("expected array");
+				};
+				let indices = x
+					.indices
+					.iter()
+					.cloned()
+					.zip(dim.iter())
+					.map(|(idx, t)| {
+						if let Type::Enum(_, e) = t {
+							let Index::Integer(r) = idx else {
+								panic!("expected integer index")
+							};
+							Index::Enum(EnumRangeInclusive::from_enum_and_positions(
+								e.clone(),
+								*r.start() as usize,
+								*r.end() as usize,
+							))
+						} else {
+							idx
+						}
+					})
+					.collect();
+				let members = if matches!(
+					**element,
+					Type::Enum(_, _) | Type::Tuple(_, _) | Type::Record(_, _) | Type::Set(_, _)
+				) {
+					x.members
+						.iter()
+						.cloned()
+						.map(|elt| elt.reverse_type_erase(element))
+						.collect()
+				} else {
+					x.members
+				};
+				Array { indices, members }.into()
+			}
+			Type::Tuple(_, tys) => {
+				let Value::Tuple(tup) = v else {
+					panic!("expected tuple")
+				};
+				Value::Tuple(
+					tup.into_iter()
+						.zip_eq(tys.iter())
+						.map(|(elt, t)| elt.reverse_type_erase(t))
+						.collect(),
+				)
+			}
+			Type::Record(_, tys) => {
+				let Value::Tuple(tup) = v else {
+					panic!("expected tuple")
+				};
+				Value::Record(
+					tup.into_iter()
+						.zip_eq(tys.iter())
+						.map(|(elt, (n, t))| (n.clone(), elt.reverse_type_erase(t)))
+						.collect(),
+				)
+			}
+			_ => v,
 		}
 	}
 }

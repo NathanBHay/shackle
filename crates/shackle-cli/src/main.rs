@@ -4,18 +4,14 @@
 #![warn(unused_crate_dependencies, unused_extern_crates)]
 #![warn(variant_size_differences)]
 
+use std::{ffi::OsStr, fs::File, ops::Deref, panic, path::PathBuf};
+
 use clap::{crate_version, Args, Parser, Subcommand};
 use env_logger::{fmt::TimestampPrecision, Builder};
 use humantime::Duration;
 use log::warn;
 use miette::{IntoDiagnostic, Report, Result};
-use shackle::diagnostics::{InternalError, ShackleError};
-use shackle::{Message, Model, Solver, Status};
-
-use std::ffi::OsStr;
-use std::fs::File;
-use std::panic;
-use std::path::PathBuf;
+use shackle::{error::InternalError, Error, Message, Model, Solver, Status};
 
 /// The main function is the entry point for the `shackle` executable.
 ///
@@ -107,12 +103,14 @@ impl Solve {
 	/// The dispatch method checks the validity of the user input and then call
 	/// the corresponding functions in the modelling libraries.
 	pub fn dispatch(&self) -> Result<()> {
-		let (model, _data) = self.base.sort_files()?;
+		let (model, data) = self.base.sort_files()?;
 		let slv = self.base.solver()?;
 
 		// Construct model, typecheck, and compile into program
 		let model = Model::from_file(model);
 		let mut program = model.compile(&slv)?;
+
+		program.add_data_files(data.iter().map(|f| f.deref()))?;
 
 		// Set program options
 		if let Some(time_limit) = self.time_limit {
@@ -123,15 +121,14 @@ impl Solve {
 		// Run resulting program and show results
 		let display_fn = |x: &Message| {
 			print!("{}", x);
-			true
+			Ok(())
 		};
-		let status = program.run(display_fn);
+		let status = program.run(display_fn)?;
 		match status {
 			Status::Infeasible => println!("=====UNSATISFIABLE====="),
 			Status::Satisfied => {}
 			Status::Optimal | Status::AllSolutions => println!("=========="),
 			Status::Unknown => println!("=====UNKNOWN====="),
-			Status::Err(err) => return Err(err.into()),
 		}
 
 		// Compilation succeeded
@@ -163,7 +160,7 @@ impl Check {
 		if errors.is_empty() {
 			Ok(())
 		} else {
-			Err(ShackleError::try_from(errors).unwrap().into())
+			Err(Error::try_from(errors).unwrap().into())
 		}
 	}
 }
@@ -196,11 +193,11 @@ impl Compile {
 						model_file = Some(f.clone())
 					}
 				}
-				Some("json") => data.push(f.clone()),
+				Some("json") | Some("dzn") => data.push(f.clone()),
 				_ => {
 					return Err(Report::msg(format!(
-						"file `{:?}' has an unsupported file type",
-						model_file
+						"file `{}' has an unsupported file type",
+						f.to_str().unwrap_or_default()
 					)));
 				}
 			}
@@ -226,12 +223,9 @@ impl Compile {
 	/// The dispatch method checks the validity of the user input and then call
 	/// the corresponding functions in the modelling libraries.
 	pub fn dispatch(&self) -> Result<()> {
-		let (model, data) = self.sort_files()?;
-		if !data.is_empty() {
-			warn!("compilation only considers a model, the data files provided are ignored.")
-		}
+		let (model, _data) = self.sort_files()?;
 
-		let filename = model.with_extension("shacke.mzn");
+		let filename = model.with_extension("shackle.mzn");
 
 		let slv = self.solver()?;
 		let model = Model::from_file(model);

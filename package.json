@@ -4,6 +4,8 @@
 	"scripts": {
 		"parser:ampl:build": "npm run build -w tree-sitter-ampl",
 		"parser:ampl:test": "npm run test -w tree-sitter-ampl",
+		"parser:datazinc:build": "npm run build -w tree-sitter-datazinc",
+		"parser:datazinc:test": "npm run test -w tree-sitter-datazinc",
 		"parser:eprime:build": "npm run build -w tree-sitter-eprime",
 		"parser:eprime:test": "npm run test -w tree-sitter-eprime",
 		"parser:minizinc:build": "npm run build -w tree-sitter-minizinc",
@@ -17,8 +19,10 @@
 	"workspaces": [
 		"editors/code",
 		"parsers/tree-sitter-ampl",
+		"parsers/tree-sitter-datazinc",
 		"parsers/tree-sitter-eprime",
-		"parsers/tree-sitter-minizinc"
+		"parsers/tree-sitter-minizinc",
+		"editors/code"
 	],
 	"devDependencies": {
 		"prettier": "^3.0.0"
