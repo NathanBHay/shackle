@@ -29,31 +29,38 @@ impl ExpressionCollector<'_> {
 	}
 
 	/// Lower an AST expression into HIR
-	pub fn collect_expression(&mut self, expression: eprime::Expression) -> ArenaIndex<Expression> {
-		let origin = Origin::new(&expression);
-		if expression.is_missing() {
-			return self.alloc_expression(origin, Expression::Missing);
-		}
-		let collected: Expression = match expression {
-			eprime::Expression::BooleanLiteral(b) => BooleanLiteral(b.value()).into(),
-			eprime::Expression::IntegerLiteral(i) => IntegerLiteral(i.value()).into(),
+    pub fn collect_expression(&mut self, expression: eprime::Expression) -> ArenaIndex<Expression> {
+        let origin = Origin::new(&expression);
+        if expression.is_missing() {
+            return self.alloc_expression(origin, Expression::Missing);
+        }
+        let collected: Expression = match expression {
+            eprime::Expression::BooleanLiteral(b) => BooleanLiteral(b.value()).into(),
+            eprime::Expression::IntegerLiteral(i) => IntegerLiteral(i.value()).into(),
 			eprime::Expression::Infinity(_) => Expression::Infinity,
 			eprime::Expression::StringLiteral(s) => StringLiteral::new(s.value(), self.db).into(),
-			eprime::Expression::MatrixLiteral(m) => return self.collect_matrix_literal(m),
-			eprime::Expression::Call(c) => self.collect_call(c).into(),
-			eprime::Expression::Identifier(i) => Identifier::new(i.name(), self.db).into(),
-			eprime::Expression::ArrayAccess(aa) => self.collect_array_access(aa).into(),
-			eprime::Expression::InfixOperator(o) => return self.collect_infix_operator(o),
-			eprime::Expression::PrefixOperator(o) => return self.collect_prefix_operator(o),
-			eprime::Expression::PostfixOperator(o) => return self.collect_postfix_operator(o),
-			eprime::Expression::Quantification(q) => self.collect_quantification(q).into(),
-			eprime::Expression::MatrixComprehension(m) => {
-				self.collect_matrix_comprehension(m).into()
-			}
-			eprime::Expression::AbsoluteOperator(a) => return self.collect_absolute_operator(a),
-		};
-		self.alloc_expression(origin, collected)
-	}
+            eprime::Expression::MatrixLiteral(m) => return self.collect_matrix_literal(m),
+            eprime::Expression::Call(c) => 
+				self.collect_operator_call(c.function().name(), c.arguments(), origin.clone()).into(),
+            eprime::Expression::Identifier(i) => Identifier::new(i.name(), self.db).into(),
+            eprime::Expression::ArrayAccess(aa) => self.collect_array_access(aa).into(),
+            eprime::Expression::InfixOperator(o) => 
+				self.collect_operator_call(o.operator().name(), vec![o.left(), o.right()].into_iter(), origin.clone()).into(),
+            eprime::Expression::PrefixOperator(o) => 
+				self.collect_operator_call(o.operator().name(), iter::once(o.operand()), origin.clone()).into(),
+			eprime::Expression::PrefixSetConstructor(o) => 
+				self.collect_operator_call(o.operator().name(), iter::once(o.operand()), origin.clone()).into(),
+			eprime::Expression::PostfixSetConstructor(o) => 
+				self.collect_operator_call(format!("{}o", o.operator().name()).as_str(), iter::once(o.operand()), origin.clone()).into(),
+            eprime::Expression::Quantification(q) => self.collect_quantification(q).into(),
+            eprime::Expression::MatrixComprehension(m) => return self.collect_matrix_comprehension(m),
+            eprime::Expression::AbsoluteOperator(a) => 
+				self.collect_operator_call("abs", iter::once(a.operand()), origin.clone()).into(),
+			eprime::Expression::SetConstructor(o) =>  
+				self.collect_operator_call(o.operator().name(), vec![o.left(), o.right()].into_iter(), origin.clone()).into(),
+        };
+        self.alloc_expression(origin, collected)
+    }
 
 	/// Lower Domain/Type into HIR
 	pub fn collect_domain(&mut self, d: eprime::Domain, var_type: VarType) -> ArenaIndex<Type> {
@@ -148,21 +155,23 @@ impl ExpressionCollector<'_> {
 				return CollectedDomain::PrimitiveDomain(PrimitiveType::Bool)
 			}
 			eprime::Domain::IntegerDomain(i) => {
-				let mut call_domain_members = Vec::new();
-				let mut literal_domain_members = Vec::new();
+				let mut set_constructor_domain_members = Vec::new();
+				let mut domain_members = Vec::new();
 				for e in i.domain() {
 					match e {
-						eprime::Expression::IntegerLiteral(i) => literal_domain_members.push(
-							self.alloc_expression(Origin::new(&i), IntegerLiteral(i.value())),
-						),
+						eprime::Expression::PrefixSetConstructor(_) |
+						eprime::Expression::PostfixSetConstructor(_) |
+						eprime::Expression::SetConstructor(_) => {
+							set_constructor_domain_members.push(self.collect_expression(e.into()))
+						},
 						e => {
-							call_domain_members.push(self.collect_expression(e));
+							domain_members.push(self.collect_expression(e));
 						}
 					}
 				}
-				let call_domain = if call_domain_members.len() > 1 {
+				let call_domain = if set_constructor_domain_members.len() > 1 {
 					let union_expr = self.ident_exp(origin.clone(), "union");
-					call_domain_members.into_iter().reduce(|acc, e| {
+					set_constructor_domain_members.into_iter().reduce(|acc, e| {
 						self.alloc_expression(
 							origin.clone(),
 							Call {
@@ -172,20 +181,20 @@ impl ExpressionCollector<'_> {
 						)
 					})
 				} else {
-					call_domain_members.into_iter().next()
+					set_constructor_domain_members.into_iter().next()
 				};
-				let literal_domain = if literal_domain_members.len() > 0 {
+				let domain = if domain_members.len() > 0 {
 					Some(self.alloc_expression(
 						origin.clone(),
 						SetLiteral {
-							members: literal_domain_members.into_boxed_slice(),
+							members: domain_members.into_boxed_slice(),
 						},
 					))
 				} else {
 					None
 				};
 
-				match (literal_domain, call_domain) {
+				match (domain, call_domain) {
 					(Some(l), Some(d)) => {
 						let union_expr = self.ident_exp(origin.clone(), "union");
 						self.alloc_expression(
@@ -201,57 +210,41 @@ impl ExpressionCollector<'_> {
 					(None, None) => return CollectedDomain::PrimitiveDomain(PrimitiveType::Int),
 				}
 			}
+			eprime::Domain::AnyDomain(_) => {
+				return CollectedDomain::ArrayDomain(Type::Any)
+			}
 		})
 	}
 
-	/// Lower function calls into HIR
-	pub fn collect_call(&mut self, c: eprime::Call) -> Call {
-		let operator = c.function();
-		let function = self.ident_exp(
-			Origin::new(&c),
-			// Convert Eprime calls to MiniZinc ones
-			match operator.name() {
-				"toInt" => "booltoint",
-				"toSet" => "arraytoset",
-				"and" => "forall",
-				"or" => "exists",
-				"gcc" => "global_cardinality",
-				"allDiff" => "all_different",
-				o => o,
-			},
-		);
-		Call {
-			arguments: c.arguments().map(|a| self.collect_expression(a)).collect(),
-			function,
-		}
-	}
-
-	fn collect_infix_operator(&mut self, o: eprime::InfixOperator) -> ArenaIndex<Expression> {
-		let arguments: Box<[ArenaIndex<Expression>]> = [o.left(), o.right()]
+	fn collect_operator_call(&mut self, o: &str, args: impl Iterator<Item = eprime::Expression>, origin: Origin) -> Call {
+		let arguments = args
 			.into_iter()
-			.map(|e| self.collect_expression(e))
-			.collect();
-		let operator = o.operator();
+			.map(|a| self.collect_expression(a))
+			.collect::<Box<_>>();
 		let function = self.ident_exp(
-			Origin::new(&operator),
+			origin.clone(),
 			// Convert Eprime operators to MiniZinc ones
-			match operator.name() {
+			match o {
 				"==" => "eq",
 				"%" => "mod",
 				"<lex" => "lex_less",
 				"<=lex" => "lex_lesseq",
 				">lex" => "lex_greater",
 				">=lex" => "lex_greatereq",
+				"!" => "not",
+				"/" => "div",
+				"toInt" => "booltoint",
+				"toSet" => "arraytoset",
+				"and" => "forall",
+				"or" => "exists",
+				"allDiff" => "all_different",
 				o => o,
 			},
 		);
-		self.alloc_expression(
-			Origin::new(&o),
-			Call {
-				function,
-				arguments,
-			},
-		)
+		Call {
+			function,
+			arguments,
+		}
 	}
 
 	fn collect_array_access(&mut self, aa: eprime::ArrayAccess) -> ArrayAccess {
@@ -329,14 +322,7 @@ impl ExpressionCollector<'_> {
 			(d, i) => {
 				let (src, span) = ml.cst_node().source_span(self.db.upcast());
 				if d > 6 {
-					self.add_diagnostic(InvalidArrayLiteral {
-						src,
-						span,
-						msg:
-							"Support for matrix literals with >6 dimensions not currently supported"
-								.to_string(),
-					});
-					return self.alloc_expression(origin, Expression::Missing);
+					return self.add_array_over_dims_diagnostic(eprime::Expression::MatrixLiteral(ml));
 				}
 				if d != i && i != 0 {
 					self.add_diagnostic(InvalidArrayLiteral {
@@ -346,13 +332,8 @@ impl ExpressionCollector<'_> {
 					});
 					return self.alloc_expression(origin, Expression::Missing);
 				}
-				// If no index set exists guess the index set dimensions
+				// If no index set exists use index set sized at dimensions
 				if i == 0 {
-					self.add_diagnostic(InvalidArrayLiteral{
-						src,
-						span,
-						msg: "Matrix literal has unknown index sets, guessing set of 1..n, prone to failure".to_string()
-					});
 					index_sets = dimensions
 						.iter()
 						.map(|n| {
@@ -383,51 +364,6 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_prefix_operator(&mut self, o: eprime::PrefixOperator) -> ArenaIndex<Expression> {
-		let arguments = Box::new([self.collect_expression(o.operand())]);
-		let operator = o.operator();
-		let function = self.ident_exp(
-			Origin::new(&operator),
-			if operator.name() == "!" {
-				"not"
-			} else {
-				operator.name()
-			},
-		);
-		self.alloc_expression(
-			Origin::new(&o),
-			Call {
-				arguments,
-				function,
-			},
-		)
-	}
-
-	fn collect_postfix_operator(&mut self, o: eprime::PostfixOperator) -> ArenaIndex<Expression> {
-		let arguments = Box::new([self.collect_expression(o.operand())]);
-		let operator = o.operator();
-		let function = self.ident_exp(Origin::new(&operator), format!("{}o", operator.name()));
-		self.alloc_expression(
-			Origin::new(&o),
-			Call {
-				function,
-				arguments,
-			},
-		)
-	}
-
-	fn collect_absolute_operator(&mut self, o: eprime::AbsoluteOperator) -> ArenaIndex<Expression> {
-		let arguments = Box::new([self.collect_expression(o.operand())]);
-		let function = self.ident_exp(Origin::new(&o), "abs");
-		self.alloc_expression(
-			Origin::new(&o),
-			Call {
-				function,
-				arguments,
-			},
-		)
-	}
-
 	fn collect_quantification(&mut self, q: eprime::Quantification) -> Call {
 		let origin = Origin::new(&q);
 		let comp = ArrayComprehension {
@@ -449,7 +385,7 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn collect_matrix_comprehension(&mut self, m: eprime::MatrixComprehension) -> Call {
+	fn collect_matrix_comprehension(&mut self, m: eprime::MatrixComprehension) -> ArenaIndex<Expression> {
 		let origin = Origin::new(&m);
 		let template = self.collect_expression(m.template());
 		let generators = m
@@ -468,22 +404,22 @@ impl ExpressionCollector<'_> {
 				generators,
 			},
 		);
-
-		// Either use provided index set or 0..n-1 index set
+		
 		match m.indices() {
 			Some(i) => {
 				let index_set = self
 					.collect_domain_expressions(i, VarType::Par)
 					.into_expression(self, origin.clone());
-				Call {
-					function: self.ident_exp(origin, "array1d"),
-					arguments: Box::new([index_set, matrix_comprehension]),
-				}
+				let function = self.ident_exp(origin.clone(), "array1d");
+				self.alloc_expression(
+					origin, 
+					Call {
+						function,
+						arguments: Box::new([index_set, matrix_comprehension]),
+					}
+				)
 			}
-			None => Call {
-				function: self.ident_exp(origin, "indexing_0"),
-				arguments: Box::new([matrix_comprehension]),
-			},
+			None => matrix_comprehension,
 		}
 	}
 
@@ -507,7 +443,8 @@ impl ExpressionCollector<'_> {
 		}
 	}
 
-	fn ident_exp<T: Into<InternedStringData>>(
+	/// Helper to create an identifier expression
+	pub fn ident_exp<T: Into<InternedStringData>>(
 		&mut self,
 		origin: Origin,
 		id: T,
@@ -516,8 +453,21 @@ impl ExpressionCollector<'_> {
 	}
 
 	/// Add a diagnostic
-	fn add_diagnostic<E: Into<Error>>(&mut self, error: E) {
+	pub fn add_diagnostic<E: Into<Error>>(&mut self, error: E) {
 		self.diagnostics.push(error.into());
+	}
+
+	/// Add diagnostic for array literals with >6 dimensions
+	pub fn add_array_over_dims_diagnostic<N: AstNode>(&mut self, n:N) -> ArenaIndex<Expression> {
+		let (src, span) = n.cst_node().source_span(self.db.upcast());
+		self.add_diagnostic(InvalidArrayLiteral {
+			src,
+			span,
+			msg:
+				"Support for matrix literals with >6 dimensions not currently supported"
+					.to_string(),
+		});
+		self.alloc_expression(Origin::new(&n), Expression::Missing)
 	}
 
 	/// Get the collected expressions
