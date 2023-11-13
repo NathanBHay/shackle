@@ -77,7 +77,7 @@ module.exports = grammar({
 				sepBy(",", field("name", $.identifier)),
 				":",
 				field("domain", $._domain),
-				optional(seq("where", field("where", $._expression)))
+				repeat(seq("where", field("where", $._expression)))
 			),
 
 		const_def: ($) =>
@@ -138,8 +138,7 @@ module.exports = grammar({
 				$.indexed_access,
 				$.infix_operator,
 				$.prefix_operator,
-				$.prefix_set_constructor,
-				$.postfix_set_constructor,
+				$.unary_set_constructor,
 				$.quantification,
 				$.matrix_comprehension,
 				$.absolute_operator,
@@ -258,21 +257,22 @@ module.exports = grammar({
 				),
 			)
 		},
-
-		postfix_set_constructor: ($) => 
-			prec.right(
-				PREC.range,
-				seq(
-					field("operand", $._expression),
-					field("operator", "..")
+		
+		unary_set_constructor: ($) =>
+			choice(
+				prec.left(
+					PREC.range,
+					seq(field("operator", ".."), field("operand", $._expression))
+				),
+				prec.right(
+					PREC.range,
+					seq(
+						field("operand", $._expression),
+						field("operator", alias("..", "..o"))
+					)
 				)
 			),
-		
-		prefix_set_constructor: ($) =>
-			prec.left(
-				PREC.range,
-				seq(field("operator", ".."), field("operand", $._expression))
-			),
+
 
 		_domain: ($) => choice($._base_domain, $.matrix_domain),
 
