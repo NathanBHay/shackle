@@ -80,11 +80,4 @@ predicate if_then_else(array[int] of var bool: c, array[int] of set of int: x, v
 predicate if_then_else(array[int] of var bool: c, array[int] of var set of int: x, var set of int: y) =
     fzn_if_then_else_var_set(c, x, y);
 
-% This might be unnecessary
 function string: show_index_sets(array[$U] of any $T: x);
-
-mzn_opt_only_range_domains = false;
-mzn_opt_annotate_defines_var = true;
-mzn_ignore_symmetry_breaking_constraints = false;
-mzn_ignore_redundant_constraints = false;
-mzn_min_version_required = 0;
