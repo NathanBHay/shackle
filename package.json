@@ -10,6 +10,8 @@
 		"parser:eprime:test": "npm run test -w tree-sitter-eprime",
 		"parser:minizinc:build": "npm run build -w tree-sitter-minizinc",
 		"parser:minizinc:test": "npm run test -w tree-sitter-minizinc",
+		"parser:xcsp3:build": "npm run build -w tree-sitter-xcsp3",
+		"parser:xcsp3:test": "npm run test -w tree-sitter-xcsp3",
 		"vscode:build": "npm run compile -w vscode-shackle",
 		"vscode:watch": "npm run watch -w vscode-shackle",
 		"vscode:lint": "npm run lint -w vscode-shackle",
@@ -22,6 +24,7 @@
 		"parsers/tree-sitter-datazinc",
 		"parsers/tree-sitter-eprime",
 		"parsers/tree-sitter-minizinc",
+		"parsers/tree-sitter-xcsp3",
 		"editors/code"
 	],
 	"devDependencies": {

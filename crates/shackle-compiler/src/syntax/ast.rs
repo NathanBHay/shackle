@@ -382,6 +382,8 @@ pub enum ConstraintModel {
 	MznModel(MznModel),
 	/// Essence' model
 	EPrimeModel(EPrimeModel),
+	/// XCSP3 model
+	XCSP3Model(XCSP3Model),
 }
 
 #[cfg(test)]
@@ -392,7 +394,7 @@ pub mod test {
 	use super::ConstraintModel;
 	use crate::{
 		file::InputLang,
-		syntax::{cst::Cst, eprime::EPrimeModel, minizinc::MznModel},
+		syntax::{cst::Cst, eprime::EPrimeModel, minizinc::MznModel, xcsp3::XCSP3Model},
 	};
 
 	/// Helper to check parsed AST
@@ -400,6 +402,7 @@ pub mod test {
 		let lang = match language {
 			InputLang::MiniZinc => tree_sitter_minizinc::language(),
 			InputLang::EPrime => tree_sitter_eprime::language(),
+			InputLang::XCSP3 => tree_sitter_xcsp3::language(),
 			_ => unreachable!("check_ast_with_lang should only be called on model files"),
 		};
 		let mut parser = Parser::new();
@@ -409,6 +412,7 @@ pub mod test {
 		let model = match language {
 			InputLang::MiniZinc => ConstraintModel::MznModel(MznModel::new(cst)),
 			InputLang::EPrime => ConstraintModel::EPrimeModel(EPrimeModel::new(cst)),
+			InputLang::XCSP3 => ConstraintModel::XCSP3Model(XCSP3Model::new(cst)),
 			_ => unreachable!("check_ast_with_lang should only be called on model files"),
 		};
 		expected.assert_debug_eq(&model);
@@ -422,6 +426,11 @@ pub mod test {
 	/// Helper to check parsed AST in EPrime
 	pub fn check_ast_eprime(source: &str, expected: Expect) {
 		check_ast_with_lang(InputLang::EPrime, source, expected)
+	}
+
+	/// Helper to check parsed AST in XCSP3
+	pub fn check_ast_xcsp3(source: &str, expected: Expect) {
+		check_ast_with_lang(InputLang::XCSP3, source, expected)
 	}
 
 	/// Helper to check parsed AST storing the expected result in a file

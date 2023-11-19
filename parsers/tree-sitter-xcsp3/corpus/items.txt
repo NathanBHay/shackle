@@ -1,0 +1,46 @@
+========
+Variable
+========
+
+<instance>
+    <variables>
+        <var id="x"> 0 1 2 </var>
+    </variables>
+</instance>
+
+---
+
+(source_file
+  (variables
+    (var
+      (attribute
+        (identifier)
+        (identifier))
+      (integer_literal)
+      (integer_literal)
+      (integer_literal))))
+
+======
+Arrays
+======
+
+<instance>
+    <variables>
+        <array id="y" size="[10]"> 1..10 </array> 
+    </variables>
+</instance>
+
+---
+
+(source_file 
+  (variables
+    (array
+      (attribute
+        (identifier)
+        (identifier))
+      (attribute
+        (identifier)
+        (integer_literal))
+      (set_constructor
+        (integer_literal)
+        (integer_literal)))))

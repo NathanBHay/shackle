@@ -17,3 +17,4 @@ pub mod db;
 // AST representations for different modelling languages
 pub mod eprime;
 pub mod minizinc;
+pub mod xcsp3;

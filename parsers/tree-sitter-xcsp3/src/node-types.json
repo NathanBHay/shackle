@@ -1,0 +1,1033 @@
+[
+  {
+    "type": "array",
+    "named": true,
+    "fields": {
+      "attribute": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "attribute",
+            "named": true
+          }
+        ]
+      },
+      "definition": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "attribute",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "\"",
+            "named": false
+          },
+          {
+            "type": "'",
+            "named": false
+          },
+          {
+            "type": "[",
+            "named": false
+          },
+          {
+            "type": "]",
+            "named": false
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "boolean_literal",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "call",
+    "named": true,
+    "fields": {
+      "argument": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "-",
+            "named": false
+          },
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "decimal_literal",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "indexed_access",
+    "named": true,
+    "fields": {
+      "collection": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      },
+      "index": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "infinity",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "instantiation",
+    "named": true,
+    "fields": {
+      "attribute": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "",
+            "named": false
+          }
+        ]
+      },
+      "definitions": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      },
+      "names": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "integer_literal",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "matrix",
+    "named": true,
+    "fields": {
+      "attribute": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "attribute",
+            "named": true
+          }
+        ]
+      },
+      "definition": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "note_comment",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "parameter",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "rational_literal",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "set",
+    "named": true,
+    "fields": {
+      "attribute": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "",
+            "named": false
+          }
+        ]
+      },
+      "member": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "possible": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "set_constructor",
+    "named": true,
+    "fields": {
+      "left": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      },
+      "operator": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "..",
+            "named": false
+          }
+        ]
+      },
+      "right": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "source_file",
+    "named": true,
+    "fields": {
+      "attribute": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "",
+            "named": false
+          },
+          {
+            "type": "attribute",
+            "named": true
+          }
+        ]
+      },
+      "item": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "instantiation",
+            "named": true
+          },
+          {
+            "type": "variables",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "tuple",
+    "named": true,
+    "fields": {
+      "member": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "var",
+    "named": true,
+    "fields": {
+      "attribute": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "attribute",
+            "named": true
+          }
+        ]
+      },
+      "definition": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "decimal_literal",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "indexed_access",
+            "named": true
+          },
+          {
+            "type": "infinity",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "rational_literal",
+            "named": true
+          },
+          {
+            "type": "set",
+            "named": true
+          },
+          {
+            "type": "set_constructor",
+            "named": true
+          },
+          {
+            "type": "tuple",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "variables",
+    "named": true,
+    "fields": {
+      "attribute": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "attribute",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "array",
+          "named": true
+        },
+        {
+          "type": "matrix",
+          "named": true
+        },
+        {
+          "type": "var",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "",
+    "named": false
+  },
+  {
+    "type": "\"",
+    "named": false
+  },
+  {
+    "type": "%",
+    "named": false
+  },
+  {
+    "type": "'",
+    "named": false
+  },
+  {
+    "type": "(",
+    "named": false
+  },
+  {
+    "type": ")",
+    "named": false
+  },
+  {
+    "type": "+",
+    "named": false
+  },
+  {
+    "type": ",",
+    "named": false
+  },
+  {
+    "type": "-",
+    "named": false
+  },
+  {
+    "type": "..",
+    "named": false
+  },
+  {
+    "type": "/>",
+    "named": false
+  },
+  {
+    "type": "<",
+    "named": false
+  },
+  {
+    "type": "</",
+    "named": false
+  },
+  {
+    "type": "=",
+    "named": false
+  },
+  {
+    "type": ">",
+    "named": false
+  },
+  {
+    "type": "[",
+    "named": false
+  },
+  {
+    "type": "]",
+    "named": false
+  },
+  {
+    "type": "][",
+    "named": false
+  },
+  {
+    "type": "array",
+    "named": false
+  },
+  {
+    "type": "block_comment",
+    "named": true
+  },
+  {
+    "type": "false",
+    "named": false
+  },
+  {
+    "type": "identifier",
+    "named": true
+  },
+  {
+    "type": "instance",
+    "named": false
+  },
+  {
+    "type": "instantiation",
+    "named": false
+  },
+  {
+    "type": "list",
+    "named": false
+  },
+  {
+    "type": "matrix",
+    "named": false
+  },
+  {
+    "type": "note",
+    "named": false
+  },
+  {
+    "type": "possible",
+    "named": false
+  },
+  {
+    "type": "required",
+    "named": false
+  },
+  {
+    "type": "true",
+    "named": false
+  },
+  {
+    "type": "value",
+    "named": false
+  },
+  {
+    "type": "var",
+    "named": false
+  },
+  {
+    "type": "variables",
+    "named": false
+  },
+  {
+    "type": "∞",
+    "named": false
+  }
+]

@@ -1,0 +1,161 @@
+========
+Literals
+========
+
+<instance>
+  <variables>
+    <var> true </var>
+    <var> 2 </var>
+    <var> 0.5 </var>
+    <var> 1/2 </var>
+    <var> infinity </var>
+  </variables>
+</instance>
+
+---
+
+(source_file
+  (variables
+    (var
+      (boolean_literal))
+    (var
+      (integer_literal))
+    (var
+      (decimal_literal))
+    (var
+      (rational_literal))
+    (var
+      (infinity))))
+
+=====
+Calls
+=====
+
+<instance>
+  <variables>
+    <var> eq(false, true) </var>
+    <var> add(1, 2, 3) </var>
+  </variables>
+</instance>
+
+---
+
+(source_file
+  (variables
+    (var
+      (call
+        (identifier)
+        (boolean_literal)
+        (boolean_literal)))
+    (var
+      (call
+        (identifier)
+        (integer_literal)
+        (integer_literal)
+        (integer_literal)))))
+
+========
+Negative 
+========
+
+<instance>
+  <variables>
+    <var> +1 </var>
+    <var> -1 </var>
+  </variables>
+</instance>
+
+---
+
+(source_file
+  (variables
+    (var
+      (integer_literal))
+    (var
+      (call
+        (integer_literal)))))
+
+================
+Set Constructors
+================
+
+<instance>
+  <variables>
+    <var> 1..5 </var>
+  </variables>
+</instance>
+
+---
+
+(source_file
+  (variables
+    (var
+      (set_constructor
+        (integer_literal)
+        (integer_literal)))))
+
+==============
+Indexed Access
+==============
+
+<instance>
+  <variables>
+    <var> x[0] </var>
+    <var> x[] </var>
+    <var> x[0][1] </var>
+  </variables>
+</instance>
+
+---
+
+(source_file
+  (variables
+    (var
+      (indexed_access
+        (identifier)
+        (integer_literal)))
+    (var
+      (indexed_access
+        (identifier)))
+    (var
+      (indexed_access
+        (identifier)
+        (integer_literal)
+        (integer_literal)))))
+
+====
+Sets
+====
+
+<instance>
+  <variables>
+    <var id="s" type ="set">
+      <required > 1 5 </ required >
+      <possible > 3 6 </ possible >
+    </var >
+  </variables>
+</instance>
+
+---
+
+(source_file)
+
+=====
+Tuple
+=====
+
+<instance>
+  <variables>
+    <var> (1, 2, 3) </var>
+  </variables>
+</instance>
+
+---
+
+(source_file
+  item: (variables
+    (var
+      definition: (tuple
+        member: (integer_literal)
+        member: (integer_literal)
+        member: (integer_literal)))))

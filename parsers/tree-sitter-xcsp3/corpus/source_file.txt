@@ -1,0 +1,57 @@
+==========
+Empty File
+==========
+
+
+---
+
+(source_file)
+
+==============
+Block Comments
+==============
+
+<!-- Single Line-->
+
+<!--
+MultiLine
+-->
+
+---
+
+(source_file
+  (block_comment)
+  (block_comment))
+
+
+========
+Elements
+========
+
+<instance>
+  <variables>
+  </variables>
+</instance>
+
+---
+
+(source_file
+  item: (variables))
+
+==========
+Attributes
+==========
+
+<instance format="XCSP3" type = 'COP'>
+
+</instance>
+
+---
+
+(source_file
+  attribute: (attribute
+    name: (identifier)
+    value: (identifier))
+  attribute: (attribute
+    name: (identifier)
+    value: (identifier)))

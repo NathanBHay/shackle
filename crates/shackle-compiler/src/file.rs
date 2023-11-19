@@ -58,6 +58,7 @@ impl InputLang {
 			Some("eprime") => Self::EPrime,
 			Some("dzn") => Self::DataZinc,
 			Some("json") => Self::Json,
+			Some("xcsp3") => Self::XCSP3,
 			_ => Self::MiniZinc,
 		}
 	}
