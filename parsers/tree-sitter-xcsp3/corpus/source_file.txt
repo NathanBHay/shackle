@@ -36,7 +36,9 @@ Elements
 ---
 
 (source_file
-  item: (variables))
+  item: (element
+    name: (identifier)
+    (identifier)))
 
 ==========
 Attributes
@@ -55,3 +57,37 @@ Attributes
   attribute: (attribute
     name: (identifier)
     value: (identifier)))
+
+=============
+Instantiation
+=============
+
+< instantiation type =" solution ">
+  <list > x [0] x [1] x [2] </list >
+  <values > 1 1 2 </ values >
+</ instantiation >
+
+---
+
+(source_file
+  (attribute
+    (identifier)
+    (identifier))
+  (element
+    (identifier)
+    (indexed_access
+      (identifier)
+      (integer_literal))
+    (indexed_access
+      (identifier)
+      (integer_literal))
+    (indexed_access
+      (identifier)
+      (integer_literal))
+    (identifier))
+  (element
+    (identifier)
+    (integer_literal)
+    (integer_literal)
+    (integer_literal)
+    (identifier)))

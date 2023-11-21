@@ -15,17 +15,29 @@ Literals
 ---
 
 (source_file
-  (variables
-    (var
-      (boolean_literal))
-    (var
-      (integer_literal))
-    (var
-      (decimal_literal))
-    (var
-      (rational_literal))
-    (var
-      (infinity))))
+  item: (element
+    name: (identifier)
+    children: (element
+      name: (identifier)
+      definition: (boolean_literal)
+      (identifier))
+    children: (element
+      name: (identifier)
+      definition: (integer_literal)
+      (identifier))
+    children: (element
+      name: (identifier)
+      definition: (decimal_literal)
+      (identifier))
+    children: (element
+      name: (identifier)
+      definition: (rational_literal)
+      (identifier))
+    children: (element
+      name: (identifier)
+      definition: (infinity)
+      (identifier))
+    (identifier)))
 
 =====
 Calls
@@ -41,18 +53,24 @@ Calls
 ---
 
 (source_file
-  (variables
-    (var
-      (call
-        (identifier)
-        (boolean_literal)
-        (boolean_literal)))
-    (var
-      (call
-        (identifier)
-        (integer_literal)
-        (integer_literal)
-        (integer_literal)))))
+  item: (element
+    name: (identifier)
+    children: (element
+      name: (identifier)
+      definition: (call
+        name: (identifier)
+        argument: (boolean_literal)
+        argument: (boolean_literal))
+      (identifier))
+    children: (element
+      name: (identifier)
+      definition: (call
+        name: (identifier)
+        argument: (integer_literal)
+        argument: (integer_literal)
+        argument: (integer_literal))
+      (identifier))
+    (identifier)))
 
 ========
 Negative 
@@ -68,12 +86,18 @@ Negative
 ---
 
 (source_file
-  (variables
-    (var
-      (integer_literal))
-    (var
+  (element
+    (identifier)
+    (element
+      (identifier)
+      (integer_literal)
+      (identifier))
+    (element
+      (identifier)
       (call
-        (integer_literal)))))
+        (integer_literal))
+      (identifier))
+    (identifier)))
 
 ================
 Set Constructors
@@ -88,11 +112,15 @@ Set Constructors
 ---
 
 (source_file
-  (variables
-    (var
+  (element
+    (identifier)
+    (element
+      (identifier)
       (set_constructor
         (integer_literal)
-        (integer_literal)))))
+        (integer_literal))
+      (identifier))
+    (identifier)))
 
 ==============
 Indexed Access
@@ -109,19 +137,27 @@ Indexed Access
 ---
 
 (source_file
-  (variables
-    (var
-      (indexed_access
-        (identifier)
-        (integer_literal)))
-    (var
-      (indexed_access
-        (identifier)))
-    (var
-      (indexed_access
-        (identifier)
-        (integer_literal)
-        (integer_literal)))))
+  item: (element
+    name: (identifier)
+    children: (element
+      name: (identifier)
+      definition: (indexed_access
+        collection: (identifier)
+        index: (integer_literal))
+      (identifier))
+    children: (element
+      name: (identifier)
+      definition: (indexed_access
+        collection: (identifier))
+      (identifier))
+    children: (element
+      name: (identifier)
+      definition: (indexed_access
+        collection: (identifier)
+        index: (integer_literal)
+        index: (integer_literal))
+      (identifier))
+    (identifier)))
 
 ====
 Sets
@@ -138,7 +174,29 @@ Sets
 
 ---
 
-(source_file)
+(source_file
+  (element
+    (identifier)
+    (element
+      (identifier)
+      (attribute
+        (identifier)
+        (identifier))
+      (attribute
+        (identifier)
+        (identifier))
+      (element
+        (identifier)
+        (integer_literal)
+        (integer_literal)
+        (identifier))
+      (element
+        (identifier)
+        (integer_literal)
+        (integer_literal)
+        (identifier))
+      (identifier))
+    (identifier)))
 
 =====
 Tuple
@@ -153,9 +211,68 @@ Tuple
 ---
 
 (source_file
-  item: (variables
-    (var
+  item: (element
+    name: (identifier)
+    children: (element
+      name: (identifier)
       definition: (tuple
         member: (integer_literal)
         member: (integer_literal)
-        member: (integer_literal)))))
+        member: (integer_literal))
+      (identifier))
+    (identifier)))
+
+========
+Interval
+========
+
+<instance>
+  <variables>
+    <var id="w" type =" real "> [0 ,+ infinity [ </var >
+    <var id="x" type =" real "> [ -4 ,4] </var >
+    <var id="y" type =" real "> [2/3 ,8.355] </var >
+  </variables>
+</instance>
+---
+
+(source_file
+  item: (element
+    name: (identifier)
+    children: (element
+      name: (identifier)
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier))
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier))
+      definition: (interval
+        left: (integer_literal)
+        right: (infinity))
+      (identifier))
+    children: (element
+      name: (identifier)
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier))
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier))
+      definition: (interval
+        left: (call
+          argument: (integer_literal))
+        right: (integer_literal))
+      (identifier))
+    children: (element
+      name: (identifier)
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier))
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier))
+      definition: (interval
+        left: (rational_literal)
+        right: (decimal_literal))
+      (identifier))
+    (identifier)))

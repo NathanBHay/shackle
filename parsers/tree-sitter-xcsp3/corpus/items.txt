@@ -11,14 +11,47 @@ Variable
 ---
 
 (source_file
-  (variables
-    (var
+  (element
+    (identifier)
+    (element
+      (identifier)
       (attribute
         (identifier)
         (identifier))
       (integer_literal)
       (integer_literal)
-      (integer_literal))))
+      (integer_literal)
+      (identifier))
+    (identifier)))
+
+===========
+Multi Types
+===========
+
+<instance>
+  <variables>
+    <var id="x" type="symbolic set"> cat dog </var>
+  </variables>
+</instance>
+
+---
+
+(source_file
+  item: (element
+    name: (identifier)
+    children: (element
+      name: (identifier)
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier))
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier)
+        value: (identifier))
+      definition: (identifier)
+      definition: (identifier)
+      (identifier))
+    (identifier)))
 
 ======
 Arrays
@@ -33,14 +66,182 @@ Arrays
 ---
 
 (source_file 
-  (variables
-    (array
+  item: (element
+    name: (identifier)
+    children: (element
+      name: (identifier)
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier))
+      attribute: (attribute
+        name: (identifier)
+        value: (integer_literal))
+      definition: (set_constructor
+        left: (integer_literal)
+        right: (integer_literal))
+      (identifier))
+    (identifier)))
+
+======
+Graphs
+======
+
+<instance>
+  <variables>
+    <var id="g" type =" undirected graph ">
+      <required >
+        <nodes > a b </nodes >
+        <edges > (a,b) </edges >
+      </ required >
+      <possible >
+        <nodes > c </nodes >
+        <edges > (a,c) (b,c) </edges >
+      </ possible >
+    </var >
+  </variables>
+</instance>
+
+---
+
+(source_file
+  item: (element
+    name: (identifier)
+    children: (element
+      name: (identifier)
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier))
+      attribute: (attribute
+        name: (identifier)
+        value: (identifier)
+        value: (identifier))
+      children: (element
+        name: (identifier)
+        children: (element
+          name: (identifier)
+          definition: (identifier)
+          definition: (identifier)
+          (identifier))
+        children: (element
+          name: (identifier)
+          definition: (tuple
+            member: (identifier)
+            member: (identifier))
+          (identifier))
+        (identifier))
+      children: (element
+        name: (identifier)
+        children: (element
+          name: (identifier)
+          definition: (identifier)
+          (identifier))
+        children: (element
+          name: (identifier)
+          definition: (tuple
+            member: (identifier)
+            member: (identifier))
+          definition: (tuple
+            member: (identifier)
+            member: (identifier))
+          (identifier))
+        (identifier))
+      (identifier))
+    (identifier)))
+
+=======
+Domains
+=======
+
+<instance>
+  <variables>
+    <array id="y" size =" [10] ">
+      <domain for="y [4]"> 0 1 </ domain >
+      <domain for=" others "> 2 4 6 </ domain >
+    </array>
+  </variables>
+</instance>
+
+---
+
+(source_file
+  (element
+    (identifier)
+    (element
+      (identifier)
       (attribute
         (identifier)
         (identifier))
       (attribute
         (identifier)
         (integer_literal))
-      (set_constructor
+      (element
+        (identifier)
+        (attribute
+          (identifier)
+          (indexed_access
+            (identifier)
+            (integer_literal)))
         (integer_literal)
-        (integer_literal)))))
+        (integer_literal)
+        (identifier))
+      (element
+        (identifier)
+        (attribute
+          (identifier)
+          (identifier))
+        (integer_literal)
+        (integer_literal)
+        (integer_literal)
+        (identifier))
+      (identifier))
+    (identifier)))
+
+==========
+Objectives
+==========
+
+<instance>
+  <objectives>
+    <minimize> z </ minimize >
+    <minimize id=" obj1 " type =" sum">
+      <list > x1 x2 x3 x4 x5 </list >
+      <coeffs > 2 4 1 4 8 </ coeffs >
+    </ minimize >
+  </objectives>
+</instance>
+
+---
+
+(source_file
+  (element
+    (identifier)
+    (element
+      (identifier)
+      (identifier)
+      (identifier))
+    (element
+      (identifier)
+      (attribute
+        (identifier)
+        (identifier))
+      (attribute
+        (identifier)
+        (identifier))
+      (element
+        (identifier)
+        (identifier)
+        (identifier)
+        (identifier)
+        (identifier)
+        (identifier)
+        (identifier))
+      (element
+        (identifier)
+        (integer_literal)
+        (integer_literal)
+        (integer_literal)
+        (integer_literal)
+        (integer_literal)
+        (identifier))
+      (identifier))
+    (identifier)))

@@ -2,13 +2,13 @@
 2 Variables
 	2.1 Zero/One Variables (Done)
 	2.2 Integer Variables (Done)
-	2.3 Symbolic Variables 
-	2.4 Real Variables
-	2.5 Set Variables
-	2.6 Graph Variables
-	2.7 Stochastic Variables
-	2.8 Qualitative Variables
-	2.9 Arrays of Variables
+	2.3 Symbolic Variables (Done)
+	2.4 Real Variables (Done)
+	2.5 Set Variables (Done)
+	2.6 Graph Variables (Done)
+	2.7 Stochastic Variables TODO
+	2.8 Qualitative Variable TODO
+	2.9 Arrays of Variables 
 	2.9.1 Using Compact Forms
 	2.9.2 Dealing With Mixed Domains
 	2.10 Empty Domains, Undefined and Useless Variables
@@ -39,38 +39,33 @@ module.exports = grammar({
 		source_file: ($) => 
 			seq(
 				optional(
-					element("instance", $.attribute, repeat(field("item", $._item)))
+					element("instance", $.attribute, repeat(field("item", $.element)))
 				),
 				optional(
-					element("instantiation", "", repeat(field("item", $.instantiation)))
+					element("instantiation", $.attribute, repeat(field("item", $.element)))
 				)
 			),
 
-		instantiation: ($) => 
-			seq(
-				element("list", "", repeat(field("names", $._expression))),
-				element("value", "", repeat(field("definitions", $._expression))),
-			),
+		// instantiation: ($) => 
+		// 	seq(
+		// 		element("list", "", repeat(field("names", $._expression))),
+		// 		element("value", "", repeat(field("definitions", $._expression))),
+		// 	),
 
-		_item: ($) => 
-			choice(
-				$.variables,
+		element: ($) => 
+			element(
+				$.identifier, 
+				$.attribute, 
+				repeat(field("children", choice(
+					$.element, 
+					prec.left(field("definition", repeat1($._expression)))
+				)))
 			),
-
-		variables: ($) => 
-			element("variables", $.attribute, repeat(choice(
-				$.var,
-				$.array,
-				$.matrix,
-			))),
-		var: ($) => element("var", $.attribute, repeat1(field("definition", $._expression))),
-		array: ($) => element("array", $.attribute, field("definition", $._expression)),
-		matrix: ($) => element("matrix", $.attribute, field("definition", $._expression)),
 
 		attribute: ($) => 
 			seq(
 				field("name", $.identifier),
-				optional(seq('=', field("value", $._quoted_identifier))),
+				optional(seq('=', sepBy1(" ", field("value", $._quoted_identifier)))),
 		  	),
 		
 		_expression: ($) => 
@@ -80,12 +75,12 @@ module.exports = grammar({
 				$.integer_literal,
 				$.decimal_literal,
 				$.rational_literal,
+				$.interval,
 				$.infinity,
 				$.parameter,
 				$.indexed_access,
 				$.call,
 				$.set_constructor,
-				// $.set,
 				$.tuple
 			),
 
@@ -131,19 +126,13 @@ module.exports = grammar({
 				)
 			),
 			
-		intervals: ($) =>
+		interval: ($) =>
 			seq(
 				choice("[", "]"), // Infinity is written ]-infinity, infinity[
 				field("left", $._expression),
 				",",
 				field("right", $._expression),
 				choice("[", "]"),
-			),
-
-		set: ($) =>
-			seq(
-				element("required", "", repeat1(field("member", $.identifier))),
-				element("possible", "", repeat1(field("possible", $.identifier)))
 			),
 		
 		tuple: ($) =>
@@ -165,8 +154,8 @@ module.exports = grammar({
 		// However, for simpicity we will just use the identifier for both
 		identifier: (_) => /[A-Za-z][A-Za-z0-9_]*/,
 		_quoted_identifier: ($) => choice(
-			seq("'", choice($.identifier, $.indexed_access, $._size_literal), "'"),
-			seq('"', choice($.identifier, $.indexed_access, $._size_literal), '"'),
+			seq("'", choice(repeat1($.identifier), $.indexed_access, $._size_literal), "'"),
+			seq('"', choice(repeat1($.identifier), $.indexed_access, $._size_literal), '"'),
 		),
 		// Probably will needed to be removed
 		_size_literal: ($) => seq("[", $.integer_literal, "]"),
@@ -197,7 +186,7 @@ function element(name, attribute, contents) {
 		// Normal tags
 		seq(
 			"<", 
-			name,
+			field("name", name),
 			optional(repeat(field("attribute", attribute))),
 			">", 
 			contents, 

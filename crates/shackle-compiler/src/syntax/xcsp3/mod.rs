@@ -76,12 +76,16 @@ as -> "as"
 size -> "size"
 start index -> "startIndex"
 
+Arrays & Sets have required and possible elements
+
 Types:
     Default type is integer
     "integer" which is a intVal or int interval
     "Symbolic" which are enums
     "real" which are floats
-    "set" which has s
+    "set" which has sets of items which is chained
+	"stochastic"
+	"qualtitative"
 
 
 Var:
@@ -96,4 +100,12 @@ Array:
     size
     start index
 
+Domain (For):
+	No idea how to do this
+
+Constraints:
+	Tags used as names of constraint
+
+Possible/Required:
+	No idea how to do this
 */
